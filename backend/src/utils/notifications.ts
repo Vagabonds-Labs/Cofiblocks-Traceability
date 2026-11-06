@@ -1,10 +1,9 @@
 import es from '../../locales/es.json';
 import en from '../../locales/en.json';
-import pt from '../../locales/pt.json';
 
 import { Locale } from '@/types/locale';
 
-const LOCALES = { es, en, pt };
+const LOCALES = { es, en };
 
 /**
  * Get translation value using dot notation
@@ -39,7 +38,7 @@ function formatString(template: string, args: string[]): string {
 /**
  * Get notification message from locale file
  * @param key - The notification key (e.g., "welcome_message")
- * @param lang - The language code (en, es, pt)
+ * @param lang - The language code (en, es)
  * @param args - Optional arguments to format the message
  * @returns The formatted notification message
  */
@@ -63,5 +62,5 @@ export function getNotificationMessage(
  * Validate if a language code is supported
  */
 export function isValidLocale(lang: string): lang is Locale {
-    return ['en', 'es', 'pt'].includes(lang);
+    return ['en', 'es'].includes(lang);
   }

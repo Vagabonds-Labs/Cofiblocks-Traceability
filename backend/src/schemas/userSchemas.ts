@@ -1,44 +1,12 @@
 import { z } from 'zod';
 
-/**
- * Register user schema
- */
-export const registerSchema = z.object({
-  body: z.object({
-    name: z
-      .string()
-      .min(5, 'Name must be at least 5 characters long')
-      .max(25, 'Name must be less than 25 characters')
-      .trim(),
-    email: z
-      .string()
-      .min(1, 'Email is required')
-      .email('Invalid email format')
-      .toLowerCase()
-      .trim(),
-    password: z
-      .string()
-      .min(8, 'Password must be at least 8 characters long')
-      .max(128, 'Password must be less than 128 characters'),
-    sellerType: z.enum(['PRODUCER', 'ROASTER']).optional(),
-    isAdmin: z.boolean().optional().default(false),
-  }),
-});
-
-/**
- * Login schema
- */
-export const loginSchema = z.object({
-  body: z.object({
-    email: z
-      .string()
-      .min(1, 'Email is required')
-      .email('Invalid email format')
-      .toLowerCase()
-      .trim(),
-    password: z.string().min(1, 'Password is required'),
-  }),
-});
+export const STAFF_ROLES = [
+  'COLLECTOR',
+  'COMMITTEE_MEMBER',
+  'INDUSTRY_MANAGER',
+  'STORE_KEEPER',
+  'EXPORT_MANAGER',
+] as const;
 
 /**
  * Refresh token schema
@@ -86,56 +54,6 @@ export const revokeSessionSchema = z.object({
 });
 
 /**
- * Email verification schema
- */
-export const verifyEmailSchema = z.object({
-  body: z.object({
-    token: z.string().min(1, 'Token is required'),
-  }),
-});
-
-/**
- * Password reset request schema
- */
-export const requestPasswordResetSchema = z.object({
-  body: z.object({
-    email: z
-      .string()
-      .min(1, 'Email is required')
-      .email('Invalid email format')
-      .toLowerCase()
-      .trim(),
-  }),
-});
-
-/**
- * Password reset confirmation schema
- */
-export const resetPasswordSchema = z.object({
-  body: z.object({
-    token: z.string().min(1, 'Token is required'),
-    password: z
-      .string()
-      .min(8, 'Password must be at least 8 characters long')
-      .max(128, 'Password must be less than 128 characters'),
-  }),
-});
-
-/**
- * Request verification email resend schema
- */
-export const requestVerificationEmailSchema = z.object({
-  body: z.object({
-    email: z
-      .string()
-      .min(1, 'Email is required')
-      .email('Invalid email format')
-      .toLowerCase()
-      .trim(),
-  }),
-});
-
-/**
  * Register wallet schema
  */
 export const registerWalletSchema = z.object({
@@ -152,10 +70,10 @@ export const registerWalletSchema = z.object({
     nonce: z
       .string()
       .min(1, 'Nonce is required'),
-    // Con qué firmó el usuario: una wallet de Stellar o la wallet embebida de
-    // Privy (login con email o Google). Sólo le dice al webapp con qué firmar
-    // después; la verificación de la firma es la misma en los dos casos.
-    provider: z.enum(['stellar', 'privy']).optional(),
+    // Con qué firmó el usuario: Cavos (Telegram o email), Privy o una wallet de
+    // Stellar. Sólo le dice al webapp con qué firmar después; la verificación
+    // de la firma es la misma en todos los casos.
+    provider: z.enum(['cavos', 'privy', 'stellar']).optional(),
   }),
 });
 
@@ -198,7 +116,8 @@ export const updateUserSchema = z.object({
  */
 export const getAllUsersSchema = z.object({
   query: z.object({
-    seller_type: z.enum(['PRODUCER', 'ROASTER']).optional(),
+    role: z.enum(STAFF_ROLES).optional(),
+    organization_id: z.string().uuid().optional(),
     is_admin: z
       .string()
       .transform((val) => val === 'true')
@@ -217,29 +136,6 @@ export const getAllUsersSchema = z.object({
       .optional()
       .transform((val) => (val ? parseInt(val, 10) : 0))
       .pipe(z.number().int().min(0)),
-  }),
-});
-
-// Type inference from schemas
-export type RegisterRequest = z.infer<typeof registerSchema>['body'];
-export type LoginRequest = z.infer<typeof loginSchema>['body'];
-export type RefreshTokenRequest = z.infer<typeof refreshTokenSchema>['body'];
-export type LogoutRequest = z.infer<typeof logoutSchema>['body'];
-export type GetSessionsQuery = z.infer<typeof getSessionsSchema>['query'];
-export type RevokeSessionParams = z.infer<typeof revokeSessionSchema>['params'];
-export type VerifyEmailRequest = z.infer<typeof verifyEmailSchema>['body'];
-export type RequestPasswordResetRequest = z.infer<typeof requestPasswordResetSchema>['body'];
-export type ResetPasswordRequest = z.infer<typeof resetPasswordSchema>['body'];
-export type RequestVerificationEmailRequest = z.infer<typeof requestVerificationEmailSchema>['body'];
-/**
- * Update seller type schema (admin only)
- */
-export const updateSellerTypeSchema = z.object({
-  params: z.object({
-    userId: z.string().uuid('Invalid user ID format'),
-  }),
-  body: z.object({
-    sellerType: z.enum(['PRODUCER', 'ROASTER']).nullable(),
   }),
 });
 
@@ -264,10 +160,11 @@ export const deleteUserSchema = z.object({
   }),
 });
 
+export type RefreshTokenRequest = z.infer<typeof refreshTokenSchema>['body'];
+export type GetSessionsQuery = z.infer<typeof getSessionsSchema>['query'];
 export type RegisterWalletRequest = z.infer<typeof registerWalletSchema>['body'];
 export type UpdateUserRequest = z.infer<typeof updateUserSchema>['body'];
 export type GetAllUsersQuery = z.infer<typeof getAllUsersSchema>['query'];
-export type UpdateSellerTypeRequest = z.infer<typeof updateSellerTypeSchema>['body'];
 export type UpdateAdminStatusRequest = z.infer<typeof updateAdminStatusSchema>['body'];
 export type DeleteUserParams = z.infer<typeof deleteUserSchema>['params'];
 

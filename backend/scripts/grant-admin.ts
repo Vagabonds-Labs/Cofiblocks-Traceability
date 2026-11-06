@@ -1,7 +1,7 @@
 /**
  * Da rol de admin al usuario de una wallet.
  *
- *   npm run admin:grant -- G...
+ *   npm run admin:grant -- G…
  *
  * Existe porque con una base nueva no hay forma de crear el primer admin desde
  * la app: `updateAdminStatus` exige ya ser admin. El usuario tiene que haber

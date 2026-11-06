@@ -12,13 +12,7 @@ import { StellarClient } from './StellarClient';
 import { ContractKind, toDomainError } from './errors';
 import { PreparedTransaction } from './types/transactions';
 
-/**
- * Cuánto vale una transacción preparada.
- *
- * Tiene que vencer **antes** que la orden (10 minutos, `OrderExpirationJob`):
- * si la orden se cancela y libera el stock mientras la transacción todavía
- * puede entrar, el pago llega sobre un pedido que ya no existe.
- */
+/** Cuánto vale una transacción preparada antes de que haya que volver a pedirla. */
 const DEFAULT_VALIDITY_SECONDS = 5 * 60;
 
 /** Fee base por operación, en stroops. El fee-bump lo termina de cubrir. */
@@ -35,9 +29,8 @@ export interface InvocationRequest {
 /**
  * Construye, simula y devuelve transacciones listas para firmar.
  *
- * En Starknet el backend devolvía `{ contract_address, entrypoint, calldata }` y
- * la wallet armaba la transacción. Acá el backend arma la transacción entera, la
- * simula para obtener footprint, entradas de auth y fee, y devuelve el XDR.
+ * El backend arma la transacción entera, la simula para obtener footprint,
+ * entradas de auth y fee, y devuelve el XDR.
  *
  * **El usuario es siempre la source account.** Así el `require_auth` del
  * contrato se resuelve con credenciales `SOURCE_ACCOUNT` y no hay que firmar
@@ -94,7 +87,7 @@ export class TxBuilder {
 
   /**
    * Escritura que firma el backend con su propia cuenta (asignación de roles,
-   * reparto de utilidades). Devuelve la transacción firmada lista para enviar.
+   * vínculo de caficultores). Devuelve la transacción firmada lista para enviar.
    */
   public async prepareAsService(
     request: InvocationRequest,

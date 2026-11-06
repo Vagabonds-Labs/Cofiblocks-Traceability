@@ -44,5 +44,12 @@ export function useUserData() {
     }
   }, [])
 
-  return { user, loading, error, loadUser, setUser }
+  // Sin sesión no hay nada que cargar: además de vaciar el usuario hay que
+  // terminar la carga, si no la página queda esperando para siempre.
+  const clearUser = useCallback(() => {
+    setUser(null)
+    setLoading(false)
+  }, [])
+
+  return { user, loading, error, loadUser, setUser, clearUser }
 }

@@ -1,3 +1,4 @@
+import { StaffRole } from '@prisma/client';
 import { prisma } from "@/lib/prisma";
 
 export interface CreateRefreshTokenEntry {
@@ -20,7 +21,8 @@ export interface RefreshTokenWithRelationsEntry {
         email: string | null;
         walletAddress: string | null;
         walletProvider: string | null;
-        sellerType: string | null;
+        role: StaffRole | null;
+        organizationId: string | null;
         isAdmin: boolean;
         createdAt: Date;
         updatedAt: Date;
@@ -100,7 +102,8 @@ export class DbRefreshToken {
                         email: true,
                         walletAddress: true,
                         walletProvider: true,
-                        sellerType: true,
+                        role: true,
+                        organizationId: true,
                         isAdmin: true,
                         createdAt: true,
                         updatedAt: true,

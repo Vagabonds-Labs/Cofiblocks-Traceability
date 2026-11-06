@@ -8,33 +8,41 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+// ── personal y autenticación ──────────────────────────────────────────────
+
+/// Persona que entra a la app web: personal de las cooperativas y de la unión,
+/// y los admins de CofiBlocks. Los caficultores no son `User`: usan el bot y
+/// viven en `Farmer`.
 model User {
-  id                    String         @id @default(uuid())
+  id                    String            @id @default(uuid())
   name                  String?
   email                 String?
-  createdAt             DateTime       @default(now()) @map("created_at")
-  updatedAt             DateTime       @updatedAt @map("updated_at")
-  sellerType            SellerType?    @map("seller_type")
-  isAdmin               Boolean        @default(false) @map("is_admin")
-  walletAddress         String?        @map("wallet_address")
-  walletProvider        String?        @map("wallet_provider")
-  ownedFarms            Farm[]
-  notificationsReceived Notification[] @relation("NotificationReceiver")
-  notificationsSent     Notification[] @relation("NotificationSender")
-  orders                Order[]
-  productTransactions   ProductTx[]
-  products              Product[]
+  /// Usuario de Telegram, si entró con Telegram (vía Cavos).
+  telegramUsername      String?           @map("telegram_username")
+  createdAt             DateTime          @default(now()) @map("created_at")
+  updatedAt             DateTime          @updatedAt @map("updated_at")
+  isAdmin               Boolean           @default(false) @map("is_admin")
+  walletAddress         String?           @unique @map("wallet_address")
+  walletProvider        String?           @map("wallet_provider")
+  /// Rol en el piloto. `null` hasta que un admin se lo asigna.
+  role                  StaffRole?
+  organizationId        String?           @map("organization_id")
+  /// Sólo para los Coffee Collectors: su centro de acopio.
+  collectionCenterId    String?           @map("collection_center_id")
+  /// Transacción que dejó el rol en el contrato.
+  roleTx                String?           @map("role_tx")
+  organization          Organization?     @relation(fields: [organizationId], references: [id])
+  collectionCenter      CollectionCenter? @relation(fields: [collectionCenterId], references: [id])
+  notificationsReceived Notification[]    @relation("NotificationReceiver")
+  notificationsSent     Notification[]    @relation("NotificationSender")
   refreshTokens         RefreshToken[]
   sessions              Session[]
 
   @@map("users")
 }
 
-/// Nonce de login por firma de wallet.
-///
-/// Antes lo generaba el cliente (`Date.now()-random`) y el backend nunca lo
-/// emitía ni lo invalidaba, así que una firma se podía reusar indefinidamente.
-/// Ahora lo emite `POST /auth/nonce`, vence rápido y se consume una sola vez.
+/// Nonce de login por firma de wallet. Lo emite `POST /auth/nonce`, vence
+/// rápido y se consume una sola vez.
 model AuthNonce {
   id            String    @id @default(uuid())
   nonce         String    @unique
@@ -92,174 +100,125 @@ model Notification {
   @@map("notifications")
 }
 
-model Farm {
-  id          String      @id @default(uuid())
-  name        String
-  sales       Int
-  region      String
-  country     String
-  altitude    Int
-  coordinates String
-  website     String?
-  logoUrl     String      @map("logo_url")
-  createdAt   DateTime    @default(now()) @map("created_at")
-  updatedAt   DateTime    @updatedAt @map("updated_at")
-  ownerId     String?     @map("owner_id")
-  owner       User?       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  products    Product[]
+// ── organizaciones ────────────────────────────────────────────────────────
 
-  @@map("farms")
+/// Cooperativa o unión.
+model Organization {
+  id                String             @id @default(uuid())
+  kind              OrganizationKind
+  name              String
+  /// Código corto, p. ej. `KK`. Prefija el `farmer_ref` on-chain.
+  code              String             @unique
+  /// Id numérico que usa el contrato (`org`/`coop`).
+  chainId           Int                @unique @map("chain_id")
+  region            String?
+  zone              String?
+  woreda            String?
+  createdAt         DateTime           @default(now()) @map("created_at")
+  collectionCenters CollectionCenter[]
+  farmers           Farmer[]
+  users             User[]
+
+  @@map("organizations")
 }
 
-model Product {
-  id              String         @id @default(uuid())
-  tokenId         String?        @map("token_id")
-  contractAddress String         @map("contract_address")
-  network         String
-  title           String
-  description     String?
-  roastLevel      String         @map("roast_level")
-  price           Float
-  currentStock    Int            @map("current_stock")
-  imageUrl        String?        @map("image_url")
-  farmId          String         @map("farm_id")
-  ownerId         String         @map("owner_id")
-  createdAt       DateTime       @default(now()) @map("created_at")
-  updatedAt       DateTime       @updatedAt @map("updated_at")
-  status          ProductStatus  @default(CREATION_REQUEST)
-  sales           Int            @default(0)
-  grindType       GrindType?     @map("grind_type")
-  reservedStock   Int            @default(0) @map("reserved_stock")
-  /// Producto publicado en Starknet antes de la migración a Stellar. Arranque
-  /// en frío: no se migran, se filtran del catálogo y el productor los vuelve
-  /// a publicar. No se borran.
-  legacy          Boolean        @default(false)
-  orderItems      OrderItem[]
-  transactions    ProductTx[]
-  farm            Farm           @relation(fields: [farmId], references: [id], onDelete: Cascade)
-  owner           User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+model CollectionCenter {
+  id             String       @id @default(uuid())
+  name           String
+  /// Id numérico que usa el contrato (`collection_center`).
+  chainId        Int          @unique @map("chain_id")
+  organizationId String       @map("organization_id")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  farmers        Farmer[]
+  users          User[]
 
-  @@map("products")
+  @@unique([organizationId, name])
+  @@map("collection_centers")
 }
 
-model Order {
-  id            String        @id @default(uuid())
-  buyerId       String        @map("buyer_id")
-  status        OrderStatus
-  createdAt     DateTime      @default(now()) @map("created_at")
-  expiresAt     DateTime      @map("expires_at")
-  paymentTx     String?       @map("payment_tx")
-  deliveryId    String?       @map("delivery_id")
-  orderItems    OrderItem[]
-  buyer         User          @relation(fields: [buyerId], references: [id], onDelete: Cascade)
-  delivery      Delivery?     @relation(fields: [deliveryId], references: [id], onDelete: SetNull)
+// ── caficultores ──────────────────────────────────────────────────────────
 
-  @@map("orders")
+/// Caficultor del piloto. Lo precarga la cooperativa (lista de IDs) y lo
+/// completa el propio caficultor desde el bot de Telegram.
+model Farmer {
+  id                 String            @id @default(uuid())
+  organizationId     String            @map("organization_id")
+  /// ID que le asignó la cooperativa. Único dentro de la cooperativa.
+  coopFarmerId       String            @map("coop_farmer_id")
+  collectionCenterId String?           @map("collection_center_id")
+  fullName           String?           @map("full_name")
+  phone              String?
+  /// Id numérico del usuario de Telegram. Se fija cuando el caficultor se
+  /// identifica en el bot con su ID de cooperativa.
+  telegramUserId     BigInt?           @unique @map("telegram_user_id")
+  telegramUsername   String?           @map("telegram_username")
+  language           String?
+  status             FarmerStatus      @default(PRELOADED)
+  /// Wallet Cavos, creada en la Mini App.
+  walletAddress      String?           @unique @map("wallet_address")
+  /// Transacción de `register_farmer`.
+  registerTx         String?           @map("register_tx")
+  consentHash        String?           @map("consent_hash")
+  consentTx          String?           @map("consent_tx")
+  consentAt          DateTime?         @map("consent_at")
+  linkedAt           DateTime?         @map("linked_at")
+  createdAt          DateTime          @default(now()) @map("created_at")
+  updatedAt          DateTime          @updatedAt @map("updated_at")
+  organization       Organization      @relation(fields: [organizationId], references: [id])
+  collectionCenter   CollectionCenter? @relation(fields: [collectionCenterId], references: [id])
+  botConversation    BotConversation?
+
+  @@unique([organizationId, coopFarmerId])
+  @@map("farmers")
 }
 
-model OrderItem {
-  id                   String  @id @default(uuid())
-  orderId              String  @map("order_id")
-  productId            String  @map("product_id")
-  delivered            Boolean @default(false)
-  items                Int
-  producerClaimBalance Float   @default(0) @map("producer_claim_balance")
-  sellerClaimTx        String? @map("seller_claim_tx")
-  order                Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product              Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+/// Estado de la conversación del bot con un chat de Telegram. Vive en la base
+/// para que el registro se pueda retomar donde quedó, aunque el backend se
+/// reinicie.
+model BotConversation {
+  chatId    BigInt   @id @map("chat_id")
+  farmerId  String?  @unique @map("farmer_id")
+  language  String?
+  step      String
+  data      Json     @default("{}")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  farmer    Farmer?  @relation(fields: [farmerId], references: [id], onDelete: SetNull)
 
-  @@map("order_items")
+  @@map("bot_conversations")
 }
 
-model ProductTx {
-  id        String        @id @default(uuid())
-  productId String        @map("product_id")
-  txType    ProductTxType @map("tx_type")
-  senderId  String        @map("sender_id")
-  txHash    String        @map("tx_hash")
-  createdAt DateTime      @default(now()) @map("created_at")
-  product   Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
-  sender    User          @relation(fields: [senderId], references: [id], onDelete: Cascade)
+// ── enums ─────────────────────────────────────────────────────────────────
 
-  @@map("product_tx")
+/// Roles del personal. El orden y los nombres siguen el enum `Role` del
+/// contrato (sin `Farmer`, que no es personal).
+enum StaffRole {
+  COLLECTOR
+  COMMITTEE_MEMBER
+  INDUSTRY_MANAGER
+  STORE_KEEPER
+  EXPORT_MANAGER
 }
 
-model CofiblocksEvent {
-  id          String     @id @default(uuid())
-  title       String
-  location    String?
-  description String?
-  startAt     DateTime   @db.Timestamptz @map("start_at")
-  endAt       DateTime   @db.Timestamptz @map("end_at")
-  isAllDay    Boolean?   @map("is_all_day")
-  timezone    String
-  createdAt   DateTime   @default(now()) @map("created_at")
-  updatedAt   DateTime   @updatedAt @map("updated_at")
-  urlImage    String?    @map("url_image")
-  deliveries  Delivery[]
-
-  @@map("cofiblocks_events")
+enum OrganizationKind {
+  COOPERATIVE
+  UNION
 }
 
-model Delivery {
-  id            String           @id @default(uuid())
-  method        DeliveryMethod
-  paymentTxHash String?          @map("payment_tx_hash")
-  eventId       String?          @map("event_id")
-  price         Float?
-  country       String?
-  state         String?
-  city          String?
-  address1      String?          @map("address_1")
-  address2      String?          @map("address_2")
-  name          String?
-  phone         String?
-  event         CofiblocksEvent? @relation(fields: [eventId], references: [id], onDelete: Restrict)
-  orders        Order[]
-
-  @@map("deliveries")
-}
-
-enum SellerType {
-  PRODUCER
-  ROASTER
+enum FarmerStatus {
+  /// Cargado desde la lista de la cooperativa; todavía no habló con el bot.
+  PRELOADED
+  /// Se identificó en el bot con su ID; el registro está en curso.
+  LINKED
+  /// Completó el registro en el bot.
+  REGISTERED
+  /// Firmó el consentimiento EUDR en la Mini App.
+  CONSENTED
 }
 
 enum NotificationLevel {
   WARNING
   INFO
   ERROR
-}
-
-enum OrderStatus {
-  PENDING_PAYMENT
-  PAID
-  CANCELLED
-  PENDING_DELIVERY_PAYMENT
-  IN_DELIVERY
-  DELIVERED
-}
-
-enum ProductStatus {
-  CREATION_REQUEST
-  PUBLISHED
-  HIDDEN
-  CREATION_CANCELLED
-}
-
-enum ProductTxType {
-  CREATE
-  ADD_STOCK
-  BUY
-  PAY_DELIVERY
-}
-
-enum GrindType {
-  WHOLE
-  GROUND
-}
-
-enum DeliveryMethod {
-  EVENT
-  HOME
 }

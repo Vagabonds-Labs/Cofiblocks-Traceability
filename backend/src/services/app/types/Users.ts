@@ -1,26 +1,17 @@
-import { SellerType } from "@prisma/client";
+import { UserEntry } from "@/services/db";
 import { TokenPair } from "./Auth";
 
 export interface RegisterUserData {
-    walletAddress: string;
-    walletProvider?: string;
-    /** Firma SEP-53 en base64. Antes era el par (r, s) de Starknet. */
-    signature: string;
-    nonce: string;
-  }
+  walletAddress: string;
+  walletProvider?: string;
+  /** Firma SEP-53 en base64. */
+  signature: string;
+  nonce: string;
+}
 
-  export interface UserResponse {
-    id: string;
-    name: string | null;
-    email: string | null;
-    walletAddress: string | null;
-    sellerType: SellerType | null;
-    isAdmin: boolean;
-    createdAt: Date;
-    updatedAt: Date;
-  }
+export type UserResponse = UserEntry;
 
 export interface RegisterUserResponse {
-    user: UserResponse;
-    tokens: TokenPair;
-  }
+  user: UserResponse;
+  tokens: TokenPair;
+}

@@ -1,147 +1,70 @@
 import { prisma } from '@/lib/prisma';
-import { Prisma, SellerType } from '@prisma/client';
+import { Prisma, StaffRole } from '@prisma/client';
 
-export interface UserEntry {
-  id: string;
-  name: string | null;
-  email: string | null;
-  walletAddress: string | null;
-  walletProvider: string | null;
-  sellerType: SellerType | null;
-  isAdmin: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-}
+/** Campos de `User` que circulan por la app. */
+const USER_SELECT = {
+  id: true,
+  name: true,
+  email: true,
+  telegramUsername: true,
+  walletAddress: true,
+  walletProvider: true,
+  isAdmin: true,
+  role: true,
+  organizationId: true,
+  collectionCenterId: true,
+  roleTx: true,
+  createdAt: true,
+  updatedAt: true,
+  organization: { select: { id: true, name: true, code: true, kind: true } },
+  collectionCenter: { select: { id: true, name: true } },
+} satisfies Prisma.UserSelect;
+
+export type UserEntry = Prisma.UserGetPayload<{ select: typeof USER_SELECT }>;
 
 export interface CreateUserEntry {
   walletAddress: string;
   walletProvider?: string | null;
-  sellerType?: SellerType | null;
   isAdmin?: boolean;
 }
 
 export interface UpdateUserEntry {
   name?: string;
   email?: string;
-  sellerType?: SellerType | null;
+  telegramUsername?: string | null;
   isAdmin?: boolean;
-}
-
-export interface UserFilters {
-  sellerType?: SellerType;
-  isAdmin?: boolean;
-  email?: string;
-  name?: string;
-  walletAddress?: string;
-  walletProvider?: string;
-  limit?: number;
-  offset?: number;
+  role?: StaffRole | null;
+  organizationId?: string | null;
+  collectionCenterId?: string | null;
+  roleTx?: string | null;
 }
 
 export class DbUsers {
-  async findUserByEmail(email: string): Promise<UserEntry | null> {
-    const user = await prisma.user.findFirst({
-      where: { email },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        walletAddress: true,
-        walletProvider: true,
-        sellerType: true,
-        isAdmin: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
-
-    return user;
-  }
-
   async findUserById(id: string): Promise<UserEntry | null> {
-    const user = await prisma.user.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        walletAddress: true,
-        walletProvider: true,
-        sellerType: true,
-        isAdmin: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
-
-    return user;
+    return prisma.user.findUnique({ where: { id }, select: USER_SELECT });
   }
 
   async findUserByWalletAddress(walletAddress: string): Promise<UserEntry | null> {
-    const user = await prisma.user.findFirst({
-      where: { walletAddress },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        walletAddress: true,
-        walletProvider: true,
-        sellerType: true,
-        isAdmin: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
-
-    return user;
+    return prisma.user.findUnique({ where: { walletAddress }, select: USER_SELECT });
   }
 
   async createUser(data: CreateUserEntry): Promise<UserEntry> {
-    const user = await prisma.user.create({
+    return prisma.user.create({
       data: {
         walletAddress: data.walletAddress,
         walletProvider: data.walletProvider || 'stellar',
-        sellerType: data.sellerType || null,
         isAdmin: data.isAdmin || false,
       },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        walletAddress: true,
-        walletProvider: true,
-        sellerType: true,
-        isAdmin: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+      select: USER_SELECT,
     });
-
-    return user;
   }
 
   async updateUser(userId: string, data: UpdateUserEntry): Promise<UserEntry> {
-    const updatedUser = await prisma.user.update({
-      where: { id: userId },
-      data: data,
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        walletAddress: true,
-        walletProvider: true,
-        sellerType: true,
-        isAdmin: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
-
-    return updatedUser;
+    return prisma.user.update({ where: { id: userId }, data, select: USER_SELECT });
   }
 
   async countUsers(where: Prisma.UserWhereInput): Promise<number> {
-    return await prisma.user.count({ where });
+    return prisma.user.count({ where });
   }
 
   async findUsersWithFilters(
@@ -149,33 +72,16 @@ export class DbUsers {
     limit: number,
     offset: number
   ): Promise<UserEntry[]> {
-    const users = await prisma.user.findMany({
+    return prisma.user.findMany({
       where,
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        walletAddress: true,
-        walletProvider: true,
-        sellerType: true,
-        isAdmin: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+      select: USER_SELECT,
       take: limit,
       skip: offset,
-      orderBy: {
-        createdAt: 'desc',
-      },
+      orderBy: { createdAt: 'desc' },
     });
-
-    return users;
   }
 
   async deleteUser(userId: string): Promise<void> {
-    await prisma.user.delete({
-      where: { id: userId },
-    });
+    await prisma.user.delete({ where: { id: userId } });
   }
 }
-

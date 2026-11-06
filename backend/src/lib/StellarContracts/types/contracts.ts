@@ -1,41 +1,88 @@
 export enum StellarContract {
-	MARKETPLACE = "Marketplace",
-	DISTRIBUTION = "Distribution",
-	USDC = "USDC",
+	TRACEABILITY = "Traceability",
 }
 
 /**
- * Roles del marketplace. El orden es el que serializa el contrato: el CLI y el
- * SDK los mandan como enteros.
+ * Roles del contrato `traceability`. El orden es el que serializa el contrato
+ * (`contracts/traceability/src/types.rs`): viajan como el entero de la variante.
  */
 export enum ROLES {
-	PRODUCER = "PRODUCER",
-	ROASTER = "ROASTER",
-	CAMBIATUS = "CAMBIATUS",
-	COFIBLOCKS = "COFIBLOCKS",
-	COFOUNDER = "COFOUNDER",
-	CONSUMER = "CONSUMER",
+	FARMER = "FARMER",
+	COLLECTOR = "COLLECTOR",
+	COMMITTEE_MEMBER = "COMMITTEE_MEMBER",
+	INDUSTRY_MANAGER = "INDUSTRY_MANAGER",
+	STORE_KEEPER = "STORE_KEEPER",
+	EXPORT_MANAGER = "EXPORT_MANAGER",
 }
 
 export const ROLE_DISCRIMINANTS: Record<ROLES, number> = {
-	[ROLES.PRODUCER]: 0,
-	[ROLES.ROASTER]: 1,
-	[ROLES.CAMBIATUS]: 2,
-	[ROLES.COFIBLOCKS]: 3,
-	[ROLES.COFOUNDER]: 4,
-	[ROLES.CONSUMER]: 5,
+	[ROLES.FARMER]: 0,
+	[ROLES.COLLECTOR]: 1,
+	[ROLES.COMMITTEE_MEMBER]: 2,
+	[ROLES.INDUSTRY_MANAGER]: 3,
+	[ROLES.STORE_KEEPER]: 4,
+	[ROLES.EXPORT_MANAGER]: 5,
 };
 
-/** Producto tal como lo devuelve `get_product`, ya convertido a tipos de JS. */
-export interface ListedProduct {
-	token_id: string;
-	stock: number;
-	sells: number;
-	price_usdc: string;
-	price_usdc_with_fee: string;
-	is_producer: boolean;
-	owner: string;
-	associated_producer: string | null;
-	short_description: string;
-	is_available: boolean;
+/** Etapas de un lote, en el orden del contrato. */
+export enum STAGES {
+	RECEIVED = "RECEIVED",
+	WASHING = "WASHING",
+	FERMENTATION = "FERMENTATION",
+	DRYING = "DRYING",
+	STORAGE = "STORAGE",
+	IN_TRANSPORT_TO_UNION = "IN_TRANSPORT_TO_UNION",
+	PREPARED_WITH_EXPORTABLE_BAG = "PREPARED_WITH_EXPORTABLE_BAG",
+	SOLD = "SOLD",
+}
+
+export const STAGE_DISCRIMINANTS: Record<STAGES, number> = {
+	[STAGES.RECEIVED]: 0,
+	[STAGES.WASHING]: 1,
+	[STAGES.FERMENTATION]: 2,
+	[STAGES.DRYING]: 3,
+	[STAGES.STORAGE]: 4,
+	[STAGES.IN_TRANSPORT_TO_UNION]: 5,
+	[STAGES.PREPARED_WITH_EXPORTABLE_BAG]: 6,
+	[STAGES.SOLD]: 7,
+};
+
+function invert<T extends string>(table: Record<T, number>): Record<number, T> {
+	return Object.fromEntries(Object.entries(table).map(([key, value]) => [value, key])) as Record<number, T>;
+}
+
+export const ROLE_BY_DISCRIMINANT = invert(ROLE_DISCRIMINANTS);
+export const STAGE_BY_DISCRIMINANT = invert(STAGE_DISCRIMINANTS);
+
+/** `get_member`, ya convertido a tipos de JS. */
+export interface OnChainMember {
+	role: ROLES;
+	org: number;
+}
+
+/** `get_farmer`, ya convertido a tipos de JS. */
+export interface OnChainFarmer {
+	farmer_ref: string;
+	coop: number;
+	/** Hex del SHA-256, o `null` si todavía no firmó. */
+	consent_hash: string | null;
+	consent_at: number;
+}
+
+export interface OnChainStageRecord {
+	stage: STAGES;
+	actor: string;
+	timestamp: number;
+	data_hash: string;
+}
+
+/** `get_batch`, ya convertido a tipos de JS. */
+export interface OnChainBatch {
+	id: string;
+	farmer_ref: string;
+	coop: number;
+	collection_center: number;
+	weight_grams: string;
+	stage: STAGES;
+	history: OnChainStageRecord[];
 }

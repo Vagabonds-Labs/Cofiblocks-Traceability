@@ -20,9 +20,7 @@ export function useUser() {
 }
 
 export function UserProvider({ children }: { children: React.ReactNode }) {
-  const { user, loading, error, loadUser, setUser } = useUserData();
-
-  const clearUser = () => setUser(null);
+  const { user, loading, error, loadUser, clearUser } = useUserData();
 
   useAuthWatcher(loadUser, clearUser);
   useWalletWatcher(user, clearUser);

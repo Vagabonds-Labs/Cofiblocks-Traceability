@@ -3,19 +3,16 @@ import { rpc, scValToNative, StrKey, xdr } from '@stellar/stellar-sdk';
 import { HttpException } from '@/exceptions/HttpException';
 import { logger } from '@/lib/logger';
 import { StellarClient } from './StellarClient';
-import { ROLE_DISCRIMINANTS, ROLES } from './types/contracts';
+import { ROLE_BY_DISCRIMINANT, STAGE_BY_DISCRIMINANT } from './types/contracts';
 import {
-  AssignRoleEvent,
-  BuyBatchEvent,
-  BuyProductEvent,
-  CheckoutEvents,
-  CreateProductEvents,
-  MarketplaceEventType,
-  MarketplaceEvents,
-  PaymentSellerEvent,
+  BatchCreatedEvent,
+  ConsentRecordedEvent,
+  FarmerRegisteredEvent,
   RawEvent,
-  UpdateStockEvent,
+  RoleGrantedEvent,
+  StageAdvancedEvent,
 } from './types/events';
+import { bytesToHex } from './utils/formatting';
 
 /** Un evento de contrato ya traducido a tipos de JS. */
 interface DecodedEvent {
@@ -28,20 +25,19 @@ interface DecodedEvent {
   data: Record<string, unknown>;
 }
 
-const ROLE_BY_DISCRIMINANT: Record<number, ROLES> = Object.fromEntries(
-  Object.entries(ROLE_DISCRIMINANTS).map(([role, value]) => [value, role as ROLES])
-) as Record<number, ROLES>;
-
 /** `bigint | number | string` → `string`, que es lo que compara el backend. */
 function str(value: unknown): string {
   if (value === null || value === undefined) return '';
   return typeof value === 'bigint' ? value.toString() : String(value);
 }
 
-function strArray(value: unknown): string[] {
-  return Array.isArray(value) ? value.map(str) : [];
-}
-
+/**
+ * Eventos del contrato `traceability` de una transacción.
+ *
+ * Cada `parse*` devuelve todos los eventos de ese tipo (normalmente uno). El
+ * backend los usa para verificar que la transacción hizo lo que pidió, en vez
+ * de confiar en lo que reporte el cliente.
+ */
 export class EventsParser {
   constructor(
     private readonly events: DecodedEvent[],
@@ -65,81 +61,52 @@ export class EventsParser {
     return this.events.filter((event) => event.name === name);
   }
 
-  public parseCreateProductEvents(): CreateProductEvents {
-    const event = this.byName('create_product')[0];
-    if (!event) {
-      return { createProduct: null };
-    }
-    return {
-      createProduct: {
-        // El token_id viaja como topic, no como campo de datos.
-        token_id: str(event.keys[0]),
-        initial_stock: str(event.data.initial_stock),
-        owner: str(event.data.owner),
-        price: str(event.data.price),
-      },
-    };
+  public parseRoleGranted(): RoleGrantedEvent[] {
+    return this.byName('role_granted').map((event) => ({
+      account: str(event.keys[0]),
+      role: ROLE_BY_DISCRIMINANT[Number(event.data.role)],
+      org: Number(event.data.org),
+    }));
   }
 
-  public parseAssignRoleEvents(): AssignRoleEvent {
-    const event = this.byName('assign_role')[0];
-    if (!event) {
-      return { role: '', account: '' };
-    }
-    const discriminant = Number(event.keys[0]);
-    return {
-      role: ROLE_BY_DISCRIMINANT[discriminant] ?? '',
-      account: str(event.data.assignee),
-    };
+  public parseRoleRevoked(): { account: string }[] {
+    return this.byName('role_revoked').map((event) => ({ account: str(event.keys[0]) }));
   }
 
-  public parseCheckoutEvents(): CheckoutEvents {
-    const buyProduct: BuyProductEvent[] = this.byName('buy_product').map((event) => ({
-      token_id: str(event.keys[0]),
-      amount: str(event.data.amount),
-      buyer: str(event.data.buyer),
+  public parseFarmerRegistered(): FarmerRegisteredEvent[] {
+    return this.byName('farmer_registered').map((event) => ({
+      account: str(event.keys[0]),
+      farmer_ref: str(event.data.farmer_ref),
+      coop: Number(event.data.coop),
     }));
-
-    const paymentSeller: PaymentSellerEvent[] = this.byName('payment_seller').map((event) => ({
-      seller: str(event.keys[0]),
-      token_ids: [str(event.data.token_id)],
-      payment: str(event.data.payment),
-    }));
-
-    const updateStock: UpdateStockEvent[] = this.byName('update_stock').map((event) => ({
-      token_id: str(event.keys[0]),
-      new_stock: str(event.data.new_stock),
-    }));
-
-    const batchEvent = this.byName('buy_batch')[0];
-    const buyBatch: BuyBatchEvent | null = batchEvent
-      ? {
-          buyer: str(batchEvent.keys[0]),
-          token_ids: strArray(batchEvent.data.token_ids),
-          amounts: strArray(batchEvent.data.amounts),
-          total_paid: str(batchEvent.data.total_paid),
-          delivery_fee: str(batchEvent.data.delivery_fee),
-        }
-      : null;
-
-    return { buyProduct, paymentSeller, updateStock, buyBatch };
   }
 
-  public parseEvents(eventsType: MarketplaceEventType): MarketplaceEvents {
-    if (this.isError) {
-      return [];
-    }
-    switch (eventsType) {
-      case 'CREATE_PRODUCT':
-        return this.parseCreateProductEvents();
-      case 'ASSIGN_ROLE':
-      case 'REVOKE_ROLE':
-        return this.parseAssignRoleEvents();
-      case 'CHECKOUT':
-        return this.parseCheckoutEvents();
-      default:
-        return this.getEvents();
-    }
+  public parseConsentRecorded(): ConsentRecordedEvent[] {
+    return this.byName('consent_recorded').map((event) => ({
+      account: str(event.keys[0]),
+      consent_hash: bytesToHex(event.data.consent_hash),
+    }));
+  }
+
+  public parseBatchCreated(): BatchCreatedEvent[] {
+    return this.byName('batch_created').map((event) => ({
+      id: str(event.keys[0]),
+      farmer_ref: str(event.data.farmer_ref),
+      coop: Number(event.data.coop),
+      collection_center: Number(event.data.collection_center),
+      weight_grams: str(event.data.weight_grams),
+      actor: str(event.data.actor),
+      data_hash: bytesToHex(event.data.data_hash),
+    }));
+  }
+
+  public parseStageAdvanced(): StageAdvancedEvent[] {
+    return this.byName('stage_advanced').map((event) => ({
+      id: str(event.keys[0]),
+      stage: STAGE_BY_DISCRIMINANT[Number(event.data.stage)],
+      actor: str(event.data.actor),
+      data_hash: bytesToHex(event.data.data_hash),
+    }));
   }
 }
 
@@ -147,13 +114,12 @@ export class EventsParser {
  * Lee los eventos que emitió una transacción.
  *
  * En Soroban los topics son símbolos legibles y la sección de datos es un mapa
- * indexado por nombre de campo: se terminaron los selectores hexadecimales
- * hardcodeados que hacían falta en Starknet.
+ * indexado por nombre de campo.
  *
  * **Retención:** el RPC de Soroban guarda los eventos alrededor de 7 días y las
  * transacciones bastante menos. La verificación inmediata que hace el backend
- * sigue funcionando, pero cualquier reproceso tardío tiene que apoyarse en lo
- * que ya está persistido en Postgres.
+ * sigue funcionando, pero el historial de largo plazo vive en Postgres y en
+ * `get_batch` del contrato.
  */
 export class EventsClient {
   private readonly client: StellarClient;

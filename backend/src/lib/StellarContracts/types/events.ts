@@ -1,68 +1,42 @@
-import { ROLES } from './contracts';
+import { ROLES, STAGES } from './contracts';
 
-/** topics: `["create_product", token_id]` */
-export interface CreateProductEvent {
-	token_id: string;
-	initial_stock: string;
-	owner: string;
-	/** Precio con el fee de mercado incluido: es el que persiste `Product.price`. */
-	price: string;
-}
-
-/** topics: `["buy_product", token_id]` */
-export interface BuyProductEvent {
-	token_id: string;
-	amount: string;
-	buyer: string;
-}
-
-/** topics: `["update_stock", token_id]` */
-export interface UpdateStockEvent {
-	token_id: string;
-	new_stock: string;
-}
-
-/** topics: `["payment_seller", seller]` */
-export interface PaymentSellerEvent {
-	token_ids: string[];
-	seller: string;
-	payment: string;
-}
-
-/**
- * topics: `["buy_batch", buyer]`
- *
- * Lleva `total_paid` y `delivery_fee` explícitos, así verificar el pago del
- * envío no depende de sumar los `transfer` del SAC de USDC.
- */
-export interface BuyBatchEvent {
-	buyer: string;
-	token_ids: string[];
-	amounts: string[];
-	total_paid: string;
-	delivery_fee: string;
-}
-
-/** topics: `["assign_role", role]` */
-export interface AssignRoleEvent {
-	role: string;
+/** topics: `["role_granted", account]` */
+export interface RoleGrantedEvent {
 	account: string;
+	role: ROLES;
+	org: number;
 }
 
-/** topics: `["delete_product", token_id]` */
-export interface DeleteProductEvent {
-	token_id: string;
+/** topics: `["farmer_registered", account]` */
+export interface FarmerRegisteredEvent {
+	account: string;
+	farmer_ref: string;
+	coop: number;
 }
 
-export interface CreateProductEvents {
-	createProduct: CreateProductEvent | null;
+/** topics: `["consent_recorded", account]` */
+export interface ConsentRecordedEvent {
+	account: string;
+	consent_hash: string;
 }
 
-export interface CheckoutEvents {
-	buyProduct: BuyProductEvent[] | null;
-	paymentSeller: PaymentSellerEvent[] | null;
-	updateStock: UpdateStockEvent[] | null;
-	buyBatch: BuyBatchEvent | null;
+/** topics: `["batch_created", id]` */
+export interface BatchCreatedEvent {
+	id: string;
+	farmer_ref: string;
+	coop: number;
+	collection_center: number;
+	weight_grams: string;
+	actor: string;
+	data_hash: string;
+}
+
+/** topics: `["stage_advanced", id]` */
+export interface StageAdvancedEvent {
+	id: string;
+	stage: STAGES;
+	actor: string;
+	data_hash: string;
 }
 
 /** Evento crudo, para las rutas que devuelven todo sin interpretar. */
@@ -72,13 +46,3 @@ export interface RawEvent {
 	topics: unknown[];
 	data: Record<string, unknown> | unknown;
 }
-
-export type MarketplaceEvents =
-	| CreateProductEvents
-	| AssignRoleEvent
-	| CheckoutEvents
-	| RawEvent[];
-
-export type MarketplaceEventType = 'CREATE_PRODUCT' | 'ASSIGN_ROLE' | 'REVOKE_ROLE' | 'CHECKOUT';
-
-export { ROLES };

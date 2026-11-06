@@ -301,13 +301,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cofiblocks-interfaces"
-version = "0.1.0"
-dependencies = [
- "soroban-sdk",
-]
-
-[[package]]
 name = "const-oid"
 version = "0.9.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -604,14 +597,6 @@ checksum = "f1dd6dbb5841937940781866fa1281a1ff7bd3bf827091440879f9994983d5c2"
 dependencies = [
  "block-buffer 0.12.1",
  "crypto-common 0.2.2",
-]
-
-[[package]]
-name = "distribution"
-version = "0.1.0"
-dependencies = [
- "cofiblocks-interfaces",
- "soroban-sdk",
 ]
 
 [[package]]
@@ -1111,15 +1096,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.119",
-]
-
-[[package]]
-name = "marketplace"
-version = "0.1.0"
-dependencies = [
- "cofiblocks-interfaces",
- "distribution",
- "soroban-sdk",
 ]
 
 [[package]]
@@ -1914,6 +1890,13 @@ name = "tinyvec_macros"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
+
+[[package]]
+name = "traceability"
+version = "0.1.0"
+dependencies = [
+ "soroban-sdk",
+]
 
 [[package]]
 name = "typenum"

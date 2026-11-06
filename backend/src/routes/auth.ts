@@ -16,6 +16,7 @@ import * as AuthService from '@/services/app/AuthService';
 import * as NonceService from '@/services/app/NonceService';
 import * as UsersService from '@/services/app/UsersService';
 import * as NotificationsService from '@/services/app/NotificationService';
+import * as OnChainAccountsService from '@/services/onchain/OnChainAccountsService';
 import { successResponse } from '@/utils/formatting';
 
 const router = Router();
@@ -131,6 +132,13 @@ router.delete(
     if (isNewUser) {
       await NotificationsService.pushInfoNotification(user.id, "welcome_message");
     }
+
+    // Las transacciones que firma el usuario lo usan como source account, así
+    // que la cuenta tiene que existir en la red. Se crea en segundo plano para
+    // no demorar el login; si falla, se reintenta en el próximo.
+    OnChainAccountsService.ensureAccount(address).catch((error) => {
+      req.log.error({ error, address }, 'Could not create the user account on chain');
+    });
     
     setRefreshTokenCookie(res, tokens.refreshToken);
     setAccessTokenCookie(res, tokens.accessToken);
