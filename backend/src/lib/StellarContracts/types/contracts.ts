@@ -3,8 +3,9 @@ export enum StellarContract {
 }
 
 /**
- * Roles del contrato `traceability`. El orden es el que serializa el contrato
- * (`contracts/traceability/src/types.rs`): viajan como el entero de la variante.
+ * Roles of the `traceability` contract. The order is the one the contract
+ * serializes (`contracts/traceability/src/types.rs`): they travel as the
+ * variant's integer.
  */
 export enum ROLES {
 	FARMER = "FARMER",
@@ -24,7 +25,7 @@ export const ROLE_DISCRIMINANTS: Record<ROLES, number> = {
 	[ROLES.EXPORT_MANAGER]: 5,
 };
 
-/** Etapas de un lote, en el orden del contrato. */
+/** Batch stages, in the contract's order. */
 export enum STAGES {
 	RECEIVED = "RECEIVED",
 	WASHING = "WASHING",
@@ -54,17 +55,17 @@ function invert<T extends string>(table: Record<T, number>): Record<number, T> {
 export const ROLE_BY_DISCRIMINANT = invert(ROLE_DISCRIMINANTS);
 export const STAGE_BY_DISCRIMINANT = invert(STAGE_DISCRIMINANTS);
 
-/** `get_member`, ya convertido a tipos de JS. */
+/** `get_member`, already converted to JS types. */
 export interface OnChainMember {
 	role: ROLES;
 	org: number;
 }
 
-/** `get_farmer`, ya convertido a tipos de JS. */
+/** `get_farmer`, already converted to JS types. */
 export interface OnChainFarmer {
 	farmer_ref: string;
 	coop: number;
-	/** Hex del SHA-256, o `null` si todavía no firmó. */
+	/** SHA-256 hex, or `null` if they have not signed yet. */
 	consent_hash: string | null;
 	consent_at: number;
 }
@@ -76,7 +77,7 @@ export interface OnChainStageRecord {
 	data_hash: string;
 }
 
-/** `get_batch`, ya convertido a tipos de JS. */
+/** `get_batch`, already converted to JS types. */
 export interface OnChainBatch {
 	id: string;
 	farmer_ref: string;

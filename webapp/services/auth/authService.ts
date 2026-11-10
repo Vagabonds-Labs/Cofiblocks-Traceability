@@ -113,11 +113,11 @@ export class AuthService {
   }
 
   /**
-   * Pide al backend el nonce a firmar.
+   * Requests the nonce to sign from the backend.
    *
-   * Antes lo generaba el cliente y el backend nunca lo invalidaba, así que una
-   * misma firma servía para siempre. Ahora sale del backend, vence en 5 minutos
-   * y se consume una sola vez.
+   * Previously the client generated it and the backend never invalidated it,
+   * so the same signature worked forever. Now it comes from the backend,
+   * expires in 5 minutes and can be used only once.
    */
   async requestNonce(address?: string) {
     const res = await api.post<{
@@ -127,9 +127,9 @@ export class AuthService {
   }
 
   /**
-   * `signature` es la firma en base64. `provider` indica con qué se firmó: una
-   * wallet de Stellar (SEP-53) o Cavos (su propio prefijo, con `signer`, la
-   * control key del dispositivo que firmó).
+   * `signature` is the base64 signature. `provider` says what signed it: a
+   * Stellar wallet (SEP-53) or Cavos (its own prefix, with `signer`, the
+   * control key of the device that signed).
    */
   async registerWallet(
     address: string,

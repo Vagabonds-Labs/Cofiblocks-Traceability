@@ -6,7 +6,7 @@ import * as OrganizationsService from '@/services/app/OrganizationsService';
 import { Conversation, getConversation, saveConversation } from './conversation';
 import { BOT_LANGUAGES, chooseLanguagePrompt, t } from './messages';
 
-/** Después de tantos IDs inválidos seguidos, el bot deriva a la cooperativa. */
+/** After this many invalid IDs in a row, the bot refers the farmer to their cooperative. */
 const MAX_FAILED_ATTEMPTS = 5;
 
 function chatIdOf(ctx: Context): bigint | null {
@@ -40,7 +40,7 @@ async function askCooperative(ctx: Context, chatId: bigint, language: string | n
   await ctx.reply(t(language, 'chooseCoop'), { reply_markup: keyboard });
 }
 
-/** Saludo para un caficultor ya vinculado. Devuelve `false` si no lo está. */
+/** Greeting for an already linked farmer. Returns `false` if they are not linked. */
 async function greetLinkedFarmer(ctx: Context, conversation: Conversation | null): Promise<boolean> {
   if (!ctx.from) return false;
   const farmer = await FarmersService.findFarmerByTelegramUser(BigInt(ctx.from.id));
@@ -55,17 +55,16 @@ async function greetLinkedFarmer(ctx: Context, conversation: Conversation | null
 }
 
 /**
- * Bot de Telegram de los caficultores.
+ * Farmers' Telegram bot (week 0 prototype, replaced by VoiceLedger's bot).
  *
- * v0 (semana 1): el caficultor elige idioma y cooperativa, escribe su ID y el
- * bot lo valida contra la lista que cargó la cooperativa. Si coincide, queda
- * vinculado a su cuenta de Telegram. El registro completo (datos, parcelas,
- * consentimiento) llega en la semana 2.
+ * v0: the farmer picks a language and a cooperative, types their ID and the
+ * bot checks it against the list the cooperative uploaded. If it matches, the
+ * farmer is linked to their Telegram account.
  */
 export function createBot(token: string): Bot {
   const bot = new Bot(token);
 
-  // Sólo chats privados: en un grupo, cualquiera vería el ID del caficultor.
+  // Private chats only: in a group, anyone would see the farmer's ID.
   bot.use(async (ctx, next) => {
     if (ctx.chat && ctx.chat.type !== 'private') return;
     await next();
@@ -83,7 +82,7 @@ export function createBot(token: string): Bot {
     const chatId = chatIdOf(ctx);
     if (chatId === null) return;
     const conversation = await getConversation(chatId);
-    // Cambiar el idioma no reinicia un registro ya vinculado.
+    // Changing the language does not restart an already linked registration.
     await saveConversation(chatId, {
       step: conversation?.step === 'LINKED' ? 'LINKED' : 'CHOOSE_LANGUAGE',
     });
@@ -181,7 +180,7 @@ export function createBot(token: string): Bot {
     );
   });
 
-  // Fotos, audios, ubicación: todavía no se usan en la v0.
+  // Photos, audio, location: not used yet in v0.
   bot.on('message', async (ctx) => {
     const chatId = chatIdOf(ctx);
     const conversation = chatId === null ? null : await getConversation(chatId);
@@ -193,7 +192,7 @@ export function createBot(token: string): Bot {
     try {
       await error.ctx.reply(t('en', 'error'));
     } catch {
-      // Si ni siquiera se puede responder, ya quedó en el log.
+      // If we cannot even reply, it is already in the log.
     }
   });
 

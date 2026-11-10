@@ -14,29 +14,29 @@ import {
 } from './types/events';
 import { bytesToHex } from './utils/formatting';
 
-/** Un evento de contrato ya traducido a tipos de JS. */
+/** A contract event already converted to JS types. */
 interface DecodedEvent {
   contractId: string;
-  /** Primer topic: el nombre legible del evento. */
+  /** First topic: the event's readable name. */
   name: string;
   /** Topics restantes, ya nativos. */
   keys: unknown[];
-  /** Sección de datos: un mapa indexado por nombre de campo. */
+  /** Data section: a map keyed by field name. */
   data: Record<string, unknown>;
 }
 
-/** `bigint | number | string` → `string`, que es lo que compara el backend. */
+/** `bigint | number | string` → `string`, which is what the backend compares. */
 function str(value: unknown): string {
   if (value === null || value === undefined) return '';
   return typeof value === 'bigint' ? value.toString() : String(value);
 }
 
 /**
- * Eventos del contrato `traceability` de una transacción.
+ * `traceability` contract events in a transaction.
  *
- * Cada `parse*` devuelve todos los eventos de ese tipo (normalmente uno). El
- * backend los usa para verificar que la transacción hizo lo que pidió, en vez
- * de confiar en lo que reporte el cliente.
+ * Each `parse*` returns every event of that type (usually one). The backend
+ * uses them to verify that the transaction did what was requested, instead of
+ * trusting what the client reports.
  */
 export class EventsParser {
   constructor(
@@ -111,15 +111,15 @@ export class EventsParser {
 }
 
 /**
- * Lee los eventos que emitió una transacción.
+ * Reads the events emitted by a transaction.
  *
- * En Soroban los topics son símbolos legibles y la sección de datos es un mapa
- * indexado por nombre de campo.
+ * In Soroban the topics are readable symbols and the data section is a map
+ * keyed by field name.
  *
- * **Retención:** el RPC de Soroban guarda los eventos alrededor de 7 días y las
- * transacciones bastante menos. La verificación inmediata que hace el backend
- * sigue funcionando, pero el historial de largo plazo vive en Postgres y en
- * `get_batch` del contrato.
+ * **Retention:** the Soroban RPC keeps events for about 7 days and
+ * transactions for much less. The backend's immediate verification still
+ * works, but the long-term history lives in Postgres and in the contract's
+ * `get_batch`.
  */
 export class EventsClient {
   private readonly client: StellarClient;
@@ -148,7 +148,7 @@ export class EventsClient {
   }
 }
 
-/** El contractId llega como wrapper con bytes o ya como StrKey. */
+/** The contractId arrives either as a wrapper with bytes or already as a StrKey. */
 function toContractId(raw: unknown): string {
   if (typeof raw === 'string') return raw;
   const value = (raw as { value?: Uint8Array })?.value;
@@ -175,7 +175,7 @@ function decodeContractEvents(result: rpc.Api.GetSuccessfulTransactionResponse):
         data: (data ?? {}) as Record<string, unknown>,
       });
     } catch (error) {
-      // Un evento que no sabemos leer (por ejemplo del SAC) no debe tumbar el parseo.
+      // An event we cannot read (for example from the SAC) must not break parsing.
       logger.debug({ error }, 'Skipping unparseable contract event');
     }
   }

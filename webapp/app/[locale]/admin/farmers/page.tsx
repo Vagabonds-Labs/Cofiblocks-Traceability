@@ -62,7 +62,7 @@ export default function AdminFarmersPage() {
     }
   }, [coopFilter, statusFilter, search])
 
-  // La búsqueda va al backend: se espera a que deje de escribir.
+  // Search goes to the backend: wait until the user stops typing.
   useEffect(() => {
     if (!me?.isAdmin) return
     const timer = setTimeout(load, search ? 300 : 0)
@@ -188,8 +188,8 @@ export default function AdminFarmersPage() {
 }
 
 /**
- * Importación en dos pasos: primero se revisa el archivo (dry run, no escribe
- * nada) y recién con todo en orden se habilita importar.
+ * Two-step import: first the file is checked (dry run, writes nothing), and
+ * only once everything is in order is importing enabled.
  */
 function ImportPanel({ onImported }: { onImported: () => void }) {
   const t = useTranslations('admin_farmers')

@@ -6,7 +6,7 @@ import { successResponse } from '@/utils/formatting';
 
 const router = Router();
 
-/** GET /api/organizations — cooperativas y unión, con sus centros de acopio. */
+/** GET /api/organizations — cooperatives and union, with their collection centers. */
 router.get('/', authenticate, async (_req: Request, res: Response) => {
   const organizations = await OrganizationsService.listOrganizations();
   successResponse(res, { organizations });

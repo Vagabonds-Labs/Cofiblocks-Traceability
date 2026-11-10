@@ -1,150 +1,150 @@
-# Contratos — CofiBlocks Traceability
+# Contracts — CofiBlocks Traceability
 
-Contrato `traceability` en Rust para [Soroban](https://developers.stellar.org/docs/build/smart-contracts/overview), la plataforma de contratos inteligentes de Stellar. Es la fuente de verdad pública del sistema: quién tiene qué rol, qué caficultores están registrados y por qué etapas pasó cada lote.
+The `traceability` contract, written in Rust for [Soroban](https://developers.stellar.org/docs/build/smart-contracts/overview), Stellar's smart contract platform. It is the system's public source of truth: who holds which role, which farmers are registered and which stages each batch went through.
 
-> 🚧 **Estado:** la **v0** está desplegada en testnet y es la que usa hoy el backend. La **v1**, que cumple todo el alcance del Instaward, se construye en la semana 2 (23–27 nov). Más abajo están las dos.
+> 🚧 **Status:** **v0** is deployed on testnet and is what the backend uses today. **v1**, which covers the full Instaward scope, is built in week 2 (Nov 23–27). Both are described below.
 
-## Qué registra
+## What it records
 
-- **Roles del personal**, cada uno dentro de una organización (una cooperativa o la unión).
-- **Caficultores**, identificados por un ID seudónimo (`farmer_ref`, por ejemplo `KK-ID001`), con su cooperativa y el hash de su consentimiento EUDR.
-- **Lotes** y su recorrido por las etapas: quién hizo cada cambio, cuándo, y el hash del registro completo de esa etapa.
+- **Staff roles**, each within an organization (a cooperative or the union).
+- **Farmers**, identified by a pseudonymous ID (`farmer_ref`, for example `KK-ID001`), with their cooperative and the hash of their EUDR consent.
+- **Batches** and their journey through the stages: who made each change, when, and the hash of the full record for that stage.
 
-**En la cadena no va ningún dato personal.** Nombres, teléfonos, GPS, fotos y documentos viven off-chain, en el backend. Cada registro off-chain se resume en un SHA-256 (`data_hash`, `consent_hash`): si alguien recalcula el hash y coincide, el registro no se alteró.
+**No personal data goes on chain.** Names, phone numbers, GPS points, photos and documents live off chain, in the backend. Each off-chain record is summarized as a SHA-256 (`data_hash`, `consent_hash`): if someone recomputes the hash and it matches, the record was not altered.
 
-## Estructura
+## Layout
 
 ```
 contracts/
 ├── Cargo.toml                 # workspace (soroban-sdk 27)
 ├── traceability/src/
-│   ├── lib.rs                 # funciones públicas del contrato
-│   ├── types.rs               # Role, Stage, Member, Farmer, Batch y los errores
-│   ├── storage.rs             # lectura y escritura del estado
-│   ├── events.rs              # eventos que emite cada función
+│   ├── lib.rs                 # public contract functions
+│   ├── types.rs               # Role, Stage, Member, Farmer, Batch and the errors
+│   ├── storage.rs             # state reads and writes
+│   ├── events.rs              # events emitted by each function
 │   └── test.rs                # tests
-├── scripts/deploy.sh          # build + deploy, y escribe deployments/<red>.json
-└── deployments/testnet.json   # dirección del contrato que lee el backend
+├── scripts/deploy.sh          # build + deploy, writes deployments/<network>.json
+└── deployments/testnet.json   # contract address read by the backend
 ```
 
-## v0 (desplegada)
+## v0 (deployed)
 
-En testnet: [`CAFZUGHOGCYW2ULV4ZN62T5EC7IPYZXTBKVCA3QUKO3QWJHQ5X6KB32Z`](https://stellar.expert/explorer/testnet/contract/CAFZUGHOGCYW2ULV4ZN62T5EC7IPYZXTBKVCA3QUKO3QWJHQ5X6KB32Z). El admin es la identidad `cofi-admin`, que es la cuenta del backend.
+On testnet: [`CAFZUGHOGCYW2ULV4ZN62T5EC7IPYZXTBKVCA3QUKO3QWJHQ5X6KB32Z`](https://stellar.expert/explorer/testnet/contract/CAFZUGHOGCYW2ULV4ZN62T5EC7IPYZXTBKVCA3QUKO3QWJHQ5X6KB32Z). The admin is the `cofi-admin` identity, which is the backend's account.
 
-### Funciones
+### Functions
 
-| Función | Quién firma | Qué hace |
+| Function | Signed by | What it does |
 |---|---|---|
-| `grant_role(account, role, org)` | admin | Asigna un rol de personal. |
-| `revoke_role(account)` | admin | Quita el rol. Si era caficultor, libera su `farmer_ref`. |
-| `register_farmer(account, farmer_ref, coop)` | admin | Vincula una wallet de caficultor con su ID de cooperativa. |
-| `record_consent(farmer, consent_hash)` | caficultor | Registra el consentimiento EUDR. |
-| `create_batch(actor, id, farmer_ref, collection_center, weight_grams, data_hash)` | Collector | Crea el lote en la etapa `Received`. |
-| `advance_stage(actor, id, stage, data_hash)` | el rol de la etapa | Lleva el lote a la etapa siguiente. |
-| `get_member`, `get_farmer`, `get_farmer_by_ref`, `get_batch`, `get_admin` | — | Lecturas. |
-| `set_admin`, `upgrade` | admin | Administración. |
+| `grant_role(account, role, org)` | admin | Assigns a staff role. |
+| `revoke_role(account)` | admin | Removes the role. If it was a farmer, frees their `farmer_ref`. |
+| `register_farmer(account, farmer_ref, coop)` | admin | Links a farmer's wallet to their cooperative ID. |
+| `record_consent(farmer, consent_hash)` | farmer | Records the EUDR consent. |
+| `create_batch(actor, id, farmer_ref, collection_center, weight_grams, data_hash)` | Collector | Creates the batch in the `Received` stage. |
+| `advance_stage(actor, id, stage, data_hash)` | the stage's role | Moves the batch to the next stage. |
+| `get_member`, `get_farmer`, `get_farmer_by_ref`, `get_batch`, `get_admin` | — | Reads. |
+| `set_admin`, `upgrade` | admin | Administration. |
 
-### Etapas y roles
+### Stages and roles
 
-| Etapa | Quién la marca |
+| Stage | Set by |
 |---|---|
-| `Received` (con `create_batch`) | `Collector` |
+| `Received` (with `create_batch`) | `Collector` |
 | `Washing`, `Fermentation`, `Drying` | `IndustryManager` |
-| `Storage` | `IndustryManager` o `StoreKeeper` |
+| `Storage` | `IndustryManager` or `StoreKeeper` |
 | `InTransportToUnion` | `StoreKeeper` |
 | `PreparedWithExportableBag`, `Sold` | `ExportManager` |
 
-- Las etapas avanzan de a una. La única que se puede saltear es `Fermentation` (Washing → Drying), hasta que Etiopía confirme si es una etapa propia.
-- El personal de una cooperativa solo mueve lotes de su cooperativa. El Export Manager trabaja a nivel de la unión y mueve lotes de cualquiera.
-- `CommitteeMember` no mueve lotes: carga precios diarios, que van off-chain.
-- Cada cuenta tiene un solo rol.
+- Stages advance one at a time. The only one that can be skipped is `Fermentation` (Washing → Drying), until Ethiopia confirms whether it is a stage of its own.
+- A cooperative's staff can only move that cooperative's batches. The Export Manager works at union level and can move anyone's batches.
+- `CommitteeMember` does not move batches: they set daily prices, which are stored off chain.
+- Each account has a single role.
 
-### Eventos
+### Events
 
-`role_granted`, `role_revoked`, `farmer_registered`, `consent_recorded`, `batch_created` y `stage_advanced`. El backend los usa para reconstruir el historial y enlazar cada cambio con su transacción.
+`role_granted`, `role_revoked`, `farmer_registered`, `consent_recorded`, `batch_created` and `stage_advanced`. The backend uses them to rebuild the history and link each change to its transaction.
 
-### Errores
+### Errors
 
-| Código | Error | Cuándo |
+| Code | Error | When |
 |---|---|---|
-| 1 | `NotInitialized` | El contrato no tiene admin. |
-| 2 | `NotAMember` | La cuenta no tiene rol. |
-| 3 | `Unauthorized` | El rol no permite la operación. |
-| 4 | `WrongOrganization` | El lote es de otra cooperativa. |
-| 5 | `UseRegisterFarmer` | Se intentó dar el rol de caficultor con `grant_role`. |
-| 6 | `FarmerNotFound` | No existe el caficultor. |
-| 7 | `FarmerRefTaken` | Ese `farmer_ref` ya está vinculado a otra wallet. |
-| 8 | `BatchAlreadyExists` | Ya existe un lote con ese ID. |
-| 9 | `BatchNotFound` | No existe el lote. |
-| 10 | `InvalidTransition` | La etapa no puede seguir a la actual. |
-| 11 | `InvalidWeight` | El peso no es válido. |
-| 12 | `InvalidId` | ID vacío o demasiado largo. |
+| 1 | `NotInitialized` | The contract has no admin. |
+| 2 | `NotAMember` | The account has no role. |
+| 3 | `Unauthorized` | The role does not allow the operation. |
+| 4 | `WrongOrganization` | The batch belongs to another cooperative. |
+| 5 | `UseRegisterFarmer` | Someone tried to grant the farmer role with `grant_role`. |
+| 6 | `FarmerNotFound` | The farmer does not exist. |
+| 7 | `FarmerRefTaken` | That `farmer_ref` is already linked to another wallet. |
+| 8 | `BatchAlreadyExists` | A batch with that ID already exists. |
+| 9 | `BatchNotFound` | The batch does not exist. |
+| 10 | `InvalidTransition` | The stage cannot follow the current one. |
+| 11 | `InvalidWeight` | The weight is not valid. |
+| 12 | `InvalidId` | Empty or too-long ID. |
 
-## v1 (en construcción)
+## v1 (in progress)
 
-Cambios frente a la v0, para cumplir el alcance del Instaward:
+Changes from v0, to cover the Instaward scope:
 
-- **Los caficultores no tienen wallet.** Sus acciones las firma una única **wallet de caficultores** del backend, que el admin configura con `set_farmer_agent`. On-chain, el caficultor es solo su `farmer_ref`.
-- **El lote lo crea el caficultor** (su entrega), no el Collector. El lote nace en una etapa nueva, `Delivered`, y ese registro es inmutable.
-- **El Collector registra el peso y el recibo una sola vez** (`record_reception`). El lote pasa a `Received`.
-- **El perfil de la finca es editable** (`set_profile`). Cada versión deja su hash en un evento.
-- **Documentos adjuntos** al lote (`attach_document`).
+- **Farmers have no wallet.** Their actions are signed by a single backend **farmer-agent wallet**, which the admin sets with `set_farmer_agent`. On chain, a farmer is just their `farmer_ref`.
+- **The farmer creates the batch** (their delivery), not the Collector. The batch starts in a new stage, `Delivered`, and that record is immutable.
+- **The Collector records the weight and receipt exactly once** (`record_reception`). The batch moves to `Received`.
+- **The farm profile is editable** (`set_profile`). Each version leaves its hash in an event.
+- **Documents attached** to the batch (`attach_document`).
 
-| Función nueva o cambiada | Quién firma |
+| New or changed function | Signed by |
 |---|---|
 | `set_farmer_agent(address)` | admin |
-| `register_farmer(farmer_ref, coop)`, `record_consent(farmer_ref, hash)`, `set_profile(farmer_ref, hash)` | wallet de caficultores |
-| `create_batch(batch_id, farmer_ref, center, data_hash)` | wallet de caficultores |
-| `record_reception(collector, batch_id, weight_grams, receipt_hash, data_hash)` | Collector de la cooperativa del lote |
-| `attach_document(actor, batch_id, doc_hash)` | un rol de la cooperativa del lote, o el Export Manager |
+| `register_farmer(farmer_ref, coop)`, `record_consent(farmer_ref, hash)`, `set_profile(farmer_ref, hash)` | farmer-agent wallet |
+| `create_batch(batch_id, farmer_ref, center, data_hash)` | farmer-agent wallet |
+| `record_reception(collector, batch_id, weight_grams, receipt_hash, data_hash)` | Collector of the batch's cooperative |
+| `attach_document(actor, batch_id, doc_hash)` | a role from the batch's cooperative, or the Export Manager |
 
-Los tests de permisos de la v1 son parte de la evidencia del Instaward. Cada uno de estos casos tiene que ser rechazado:
+The v1 permission tests are part of the Instaward evidence. Each of these cases must be rejected:
 
-- una cuenta cualquiera crea un lote o registra el peso;
-- un Collector de otra cooperativa registra el peso;
-- se registra el peso dos veces;
-- se crea un lote con un ID que ya existe;
-- se retrocede o se salta una etapa;
-- un rol mueve una etapa que no le toca;
-- la wallet de caficultores hace algo del personal;
-- alguien que no es el admin asigna roles.
+- an arbitrary account creates a batch or records the weight;
+- a Collector from another cooperative records the weight;
+- the weight is recorded twice;
+- a batch is created with an ID that already exists;
+- a stage goes backwards or skips ahead;
+- a role moves a stage that is not theirs;
+- the farmer-agent wallet does something reserved for staff;
+- someone other than the admin assigns roles.
 
-El diseño completo está en [`docs/plan-implementacion.md` §2.2](../docs/plan-implementacion.md#22-contrato-traceability-v1).
+The full design is in [`docs/implementation-plan.md` §2.2](../docs/implementation-plan.md#22-traceability-contract-v1).
 
-## Desarrollo
+## Development
 
-**Requisitos:**
+**Requirements:**
 
 ```bash
 rustup target add wasm32v1-none
 cargo install --locked stellar-cli
 ```
 
-**Tests** (20 en la v0):
+**Tests** (20 in v0):
 
 ```bash
 cargo test --workspace
 ```
 
-**Build.** Deja el WASM en `target/wasm32v1-none/release/traceability.wasm`:
+**Build.** Leaves the WASM at `target/wasm32v1-none/release/traceability.wasm`:
 
 ```bash
 stellar contract build
 ```
 
-**Despliegue.** Primero hace falta una identidad admin fondeada:
+**Deployment.** First you need a funded admin identity:
 
 ```bash
 ../scripts/setup-testnet.sh
 ```
 
-Después se despliega:
+Then deploy:
 
 ```bash
 ./scripts/deploy.sh testnet
 ```
 
-El script compila, sube y despliega el contrato con la identidad `STELLAR_ADMIN_IDENTITY` (por defecto `cofi-admin`) como admin, y escribe `deployments/<red>.json`.
+The script builds, uploads and deploys the contract with the `STELLAR_ADMIN_IDENTITY` identity (`cofi-admin` by default) as admin, and writes `deployments/<network>.json`.
 
-- La clave secreta de esa identidad va en `STELLAR_ADMIN_SECRET` del backend. Se obtiene con `stellar keys show cofi-admin`.
-- Los IDs numéricos de las organizaciones (cooperativas 1 a 3, unión 100, centros 11 a 34) los fija el seed del backend y no se pueden cambiar una vez que hay lotes.
+- That identity's secret key goes in the backend's `STELLAR_ADMIN_SECRET`. Get it with `stellar keys show cofi-admin`.
+- The organizations' numeric IDs (cooperatives 1 to 3, union 100, centers 11 to 34) are set by the backend seed and cannot change once batches exist.

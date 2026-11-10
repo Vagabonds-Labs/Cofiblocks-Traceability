@@ -38,7 +38,7 @@ export function Header() {
     try {
       saved = localStorage.getItem('cofiblocks-language')
     } catch {
-      // Sin acceso a localStorage se usa el idioma de la ruta.
+      // Without localStorage access, the route's language is used.
     }
     setSelectedLanguage(isSupported(saved) ? saved : locale || 'en')
   }, [locale])
@@ -48,7 +48,7 @@ export function Header() {
     try {
       localStorage.setItem('cofiblocks-language', lang)
     } catch {
-      // El cookie alcanza para que el servidor elija el idioma.
+      // The cookie is enough for the server to pick the language.
     }
     document.cookie = `cofiblocks-language=${lang}; path=/; max-age=31536000`
     window.location.reload()

@@ -1,19 +1,19 @@
-//! Acceso a storage con extensión de TTL.
+//! Storage access with TTL extension.
 //!
-//! Soroban archiva las entradas que nadie toca. Un lote vendido puede pasar
-//! meses sin movimiento y tiene que seguir siendo verificable, así que **toda**
-//! lectura y escritura pasa por acá y extiende el TTL.
+//! Soroban archives entries nobody touches. A sold batch can go months without
+//! activity and must remain verifiable, so **every** read and write goes
+//! through here and extends the TTL.
 
 use soroban_sdk::{Address, Env, String};
 
 use crate::types::{Batch, DataKey, Error, Farmer, Member};
 
-/// Un ledger cada ~5 s.
+/// One ledger every ~5 s.
 const DAY_IN_LEDGERS: u32 = 17_280;
 
-/// Extender a 150 días. Mainnet permite hasta ~180.
+/// Extend to 150 days. Mainnet allows up to ~180.
 const BUMP: u32 = 150 * DAY_IN_LEDGERS;
-/// Extender recién cuando quedan menos de 30 días.
+/// Only extend once fewer than 30 days remain.
 const THRESHOLD: u32 = 30 * DAY_IN_LEDGERS;
 
 pub fn extend_instance(env: &Env) {
@@ -40,7 +40,7 @@ fn set_persistent<T: soroban_sdk::IntoVal<Env, soroban_sdk::Val>>(
     env.storage().persistent().extend_ttl(key, THRESHOLD, BUMP);
 }
 
-// ── configuración (instance) ──────────────────────────────────────────────
+// ── configuration (instance) ──────────────────────────────────────────────
 
 pub fn set_admin(env: &Env, admin: &Address) {
     env.storage().instance().set(&DataKey::Admin, admin);

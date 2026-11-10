@@ -1,15 +1,15 @@
 "use client";
 
 /**
- * Firma con la wallet de Cavos (login con Telegram o email).
+ * Signs with the Cavos wallet (Telegram or email login).
  *
- * Igual que con Freighter o LOBSTR, el contrato con el backend es: recibe el XDR
- * sin firmar y devuelve el sobre firmado. Cavos firma con la control key del
- * dispositivo (`signXdr`): las entradas de auth de Soroban que nombran a la
- * cuenta y el sobre de la transacción. El envío lo hace el backend.
+ * As with Freighter or LOBSTR, the contract with the backend is: take the
+ * unsigned XDR and return the signed envelope. Cavos signs with the device's
+ * control key (`signXdr`): the Soroban auth entries that name the account and
+ * the transaction envelope. The backend submits it.
  *
- * Los hooks de Cavos sólo existen dentro de React. `CavosBridge` registra acá la
- * sesión activa para que `walletService`, que no es un componente, pueda firmar.
+ * Cavos hooks only exist inside React. `CavosBridge` registers the active
+ * session here so that `walletService`, which is not a component, can sign.
  */
 
 interface CavosSession {
@@ -40,11 +40,11 @@ class CavosSigner {
   }
 
   /**
-   * Espera a que Cavos termine de restaurar la sesión.
+   * Waits for Cavos to finish restoring the session.
    *
-   * Al recargar la página, la sesión de nuestro backend ya existe pero Cavos
-   * tarda un momento en reconectar la wallet. Si no aparece, es que la sesión
-   * de Cavos venció aunque la nuestra siga viva.
+   * On page reload, our backend session already exists but Cavos takes a
+   * moment to reconnect the wallet. If it does not show up, the Cavos session
+   * expired even though ours is still alive.
    */
   private async requireSession(address: string): Promise<CavosSession> {
     if (!this.session) {

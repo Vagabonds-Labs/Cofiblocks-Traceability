@@ -1,53 +1,53 @@
-# Webapp — CofiBlocks Traceability
+# Web app — CofiBlocks Traceability
 
-Web en Next.js para el **personal de las cooperativas y de la unión**: collectors, encargados de procesamiento y almacén, el Export Manager y los administradores. Los caficultores no usan la web: hablan con el bot de Telegram de VoiceLedger (ver el [README general](../README.md)).
+Next.js web app for **cooperative and union staff**: collectors, processing and warehouse managers, the Export Manager and administrators. Farmers do not use the web app: they talk to VoiceLedger's Telegram bot (see the [main README](../README.md)).
 
-> 🚧 **Estado:** login, perfil, inicio según el rol y administración de usuarios y caficultores funcionan. Las pantallas de lotes (peso, etapas, documentos, historial y CSV) llegan en la semana 3 del sprint.
+> 🚧 **Status:** login, profile, role-based home page and user and farmer administration work. The batch screens (weight, stages, documents, history and CSV) arrive in week 3 of the sprint.
 
 ## Stack
 
-- **Next.js 16** (App Router) y React 18.
-- **next-intl** para los idiomas, con el idioma en la ruta (`/es/...`; inglés sin prefijo).
+- **Next.js 16** (App Router) and React 18.
+- **next-intl** for languages, with the language in the route (`/es/...`; English has no prefix).
 - **Tailwind CSS**.
-- **[Cavos](https://cavos.xyz) (`@cavos/kit`)** para el login con email o Telegram y la wallet de Stellar invisible.
-- **Stellar Wallets Kit** para quien entra con su propia wallet (Freighter, xBull, Albedo, Lobstr, Rabet).
+- **[Cavos](https://cavos.xyz) (`@cavos/kit`)** for email or Telegram login and the invisible Stellar wallet.
+- **Stellar Wallets Kit** for people who sign in with their own wallet (Freighter, xBull, Albedo, Lobstr, Rabet).
 
-## Páginas
+## Pages
 
-| Ruta | Quién | Qué muestra |
+| Route | Who | What it shows |
 |---|---|---|
-| `/` | todos | Sin sesión: presentación del piloto. Con sesión: rol, organización, tareas del rol y cuenta de Stellar. |
-| `/login` | sin sesión | Login con email o Telegram (Cavos), o con una wallet de Stellar. |
-| `/profile` | sesión | Datos personales, dirección de Stellar y cómo se accede a la cuenta. |
-| `/admin/users` | admin | Usuarios y asignación de roles. Cada cambio se escribe en el contrato. |
-| `/admin/farmers` | admin | Importación de la lista de caficultores de cada cooperativa y su estado. |
+| `/` | anyone | Signed out: pilot overview. Signed in: role, organization, the role's tasks and the Stellar account. |
+| `/login` | signed out | Login with email or Telegram (Cavos), or with a Stellar wallet. |
+| `/profile` | session | Personal details, Stellar address and how the account is accessed. |
+| `/admin/users` | admin | Users and role assignment. Each change is written to the contract. |
+| `/admin/farmers` | admin | Upload of each cooperative's farmer list, and their status. |
 
-**Próximas** (semana 3): entregas pendientes y registro de peso y recibo para el Collector; avance de etapas por rol; listado de lotes con filtros; página del lote con su historial verificable en Stellar; subida de documentos; exportación a CSV.
+**Coming next** (week 3): pending deliveries and weight and receipt recording for the Collector; stage changes per role; batch list with filters; batch page with its history verifiable on Stellar; document upload; CSV export.
 
-## Cómo firma el usuario
+## How users sign
 
-La web nunca arma transacciones. El backend arma y simula cada transacción, la web solo la firma, y el backend la envía con fee-bump (el backend paga la comisión).
+The web app never builds transactions. The backend builds and simulates each transaction, the web app only signs it, and the backend submits it with fee-bump (the backend pays the fee).
 
-- **Usuarios de Cavos:** firman con su wallet invisible (`signXdr`). La sesión de Cavos la mantiene `CavosBridge`, y la firma la hace `services/wallet/cavosSigner.ts`.
-- **Usuarios con wallet propia:** firman con Stellar Wallets Kit (`services/wallet/walletService.ts`). Si la wallet conectada no es la de la sesión, se corta antes de firmar.
+- **Cavos users:** sign with their invisible wallet (`signXdr`). `CavosBridge` keeps the Cavos session alive, and `services/wallet/cavosSigner.ts` does the signing.
+- **Users with their own wallet:** sign with Stellar Wallets Kit (`services/wallet/walletService.ts`). If the connected wallet is not the session's wallet, signing stops before it starts.
 
-El login también es por firma: el backend manda un nonce, la wallet lo firma y el backend lo verifica (`hooks/auth/useCavosLogin.ts` y `useWalletLogin.ts`).
+Login is signature-based too: the backend sends a nonce, the wallet signs it and the backend verifies it (`hooks/auth/useCavosLogin.ts` and `useWalletLogin.ts`).
 
-## Estructura
+## Layout
 
 ```
 webapp/
-├── app/[locale]/        # páginas (una carpeta por ruta) y layout con header, footer e idioma
-├── components/          # auth, header, menu, profile, notifications, trace (enlaces a Stellar Expert), ui
-├── hooks/               # lógica de cada pantalla (login, perfil, menú, notificaciones)
-├── services/            # api/ (llamadas al backend), auth/, wallet/ (Cavos y Stellar Wallets Kit)
-├── lib/                 # providers (usuario), config de Cavos, cliente HTTP (lib/api)
-├── locales/             # textos: en.json, es.json, om.json, am.json
-├── i18n.ts              # idiomas disponibles
-└── middleware.ts        # idioma en la ruta y protección de /profile y /admin
+├── app/[locale]/        # pages (one folder per route) and the layout with header, footer and language
+├── components/          # auth, header, menu, profile, notifications, trace (Stellar Expert links), ui
+├── hooks/               # per-screen logic (login, profile, menu, notifications)
+├── services/            # api/ (backend calls), auth/, wallet/ (Cavos and Stellar Wallets Kit)
+├── lib/                 # providers (user), Cavos config, HTTP client (lib/api)
+├── locales/             # texts: en.json, es.json, om.json, am.json
+├── i18n.ts              # available languages
+└── middleware.ts        # language in the route and protection of /profile and /admin
 ```
 
-## Puesta en marcha
+## Getting started
 
 ```bash
 npm install
@@ -55,32 +55,32 @@ cp .env.example .env.local
 npm run dev                  # http://localhost:3000
 ```
 
-Necesita el backend corriendo (ver [backend/README.md](../backend/README.md)). En desarrollo, `/api/*` se redirige al backend (`NEXT_PUBLIC_API_URL`).
+It needs the backend running (see [backend/README.md](../backend/README.md)). In development, `/api/*` is proxied to the backend (`NEXT_PUBLIC_API_URL`).
 
-| Variable | Para qué |
+| Variable | Purpose |
 |---|---|
-| `NEXT_PUBLIC_API_URL` | URL del backend. |
-| `NEXT_PUBLIC_STELLAR_NETWORK` | `testnet` o `mainnet`: la red en la que firman las wallets. |
-| `NEXT_PUBLIC_ENV` | `development` o `production`. En producción no se usa el proxy de `/api`. |
-| `JWT_SECRET` | Igual a `JWT_ACCESS_SECRET` del backend. El middleware la usa para leer el rol del token y proteger `/profile` y `/admin`. |
-| `NEXT_PUBLIC_CAVOS_APP_ID` | App de Cavos. Si está vacío, solo aparece el login con wallet. |
-| `NEXT_PUBLIC_CAVOS_ENVIRONMENT` | Entorno de la consola de Cavos: `production` (por defecto) o `development`. |
+| `NEXT_PUBLIC_API_URL` | Backend URL. |
+| `NEXT_PUBLIC_STELLAR_NETWORK` | `testnet` or `mainnet`: the network wallets sign for. |
+| `NEXT_PUBLIC_ENV` | `development` or `production`. The `/api` proxy is not used in production. |
+| `JWT_SECRET` | Same value as the backend's `JWT_ACCESS_SECRET`. The middleware uses it to read the role from the token and protect `/profile` and `/admin`. |
+| `NEXT_PUBLIC_CAVOS_APP_ID` | Cavos app. If empty, only wallet login is shown. |
+| `NEXT_PUBLIC_CAVOS_ENVIRONMENT` | Cavos console environment: `production` (default) or `development`. |
 
 ### Cavos
 
-En el dashboard de Cavos hay que:
+In the Cavos dashboard you need to:
 
-- registrar los orígenes de la web (`http://localhost:3000`, staging…), porque el vault de Cavos solo carga en orígenes registrados;
-- agregar las URLs de callback del login (`/login` y sus variantes por idioma, como `/es/login`);
-- activar email y Telegram como métodos de login.
+- register the web app's origins (`http://localhost:3000`, staging…), because the Cavos vault only loads on registered origins;
+- add the login callback URLs (`/login` and its per-language variants, such as `/es/login`);
+- enable email and Telegram as login methods.
 
-La configuración está en `lib/auth/cavos.ts`. **El `appSalt` no se puede cambiar** una vez que hay usuarios: nombra el lugar donde cada dispositivo guarda su clave, y si cambia, todos los usuarios quedan esperando aprobar su dispositivo.
+The configuration is in `lib/auth/cavos.ts`. **`appSalt` cannot change** once there are users: it names the place where each device stores its key, and if it changes, every user is left waiting to approve their device.
 
-## Idiomas
+## Languages
 
-Inglés (por defecto), español, afaan oromo (`om`) y amárico (`am`).
+English (default), Spanish, Afaan Oromoo (`om`) and Amharic (`am`).
 
-- El idioma se elige en el header y se guarda en una cookie.
-- El amárico usa la fuente Noto Sans Ethiopic, porque Manrope no tiene su escritura.
-- Los textos en oromo y amárico son un primer borrador y los tiene que revisar una persona nativa.
-- Para agregar un texto: la misma clave en los cuatro archivos de `locales/`.
+- The language is chosen in the header and saved in a cookie.
+- Amharic uses the Noto Sans Ethiopic font, because Manrope does not include its script.
+- The Oromo and Amharic texts are a first draft and need review by a native speaker.
+- To add a text: use the same key in all four files in `locales/`.

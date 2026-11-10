@@ -26,13 +26,13 @@ import {
 } from '../utils/scval';
 
 /**
- * Envoltorio del contrato `traceability`.
+ * Wrapper for the `traceability` contract.
  *
- * - Las escrituras del admin (roles, vincular caficultores) devuelven una
- *   `Transaction` firmada por el backend, lista para `TxSubmitter.submitAsService`.
- * - Las escrituras de un usuario (consentimiento, lotes, etapas) devuelven una
- *   `PreparedTransaction` con el usuario como source account, para que la firme
- *   su wallet y el backend la envíe con fee-bump.
+ * - Admin writes (roles, linking farmers) return a `Transaction` signed by the
+ *   backend, ready for `TxSubmitter.submitAsService`.
+ * - User writes (consent, batches, stages) return a `PreparedTransaction` with
+ *   the user as the source account, for their wallet to sign and the backend
+ *   to submit with fee-bump.
  */
 export class Traceability {
 	public readonly contractAddress: string;

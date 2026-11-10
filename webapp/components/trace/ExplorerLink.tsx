@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 
 import { explorerUrl } from '@/utils/stellar'
 
-/** Enlace a Stellar Expert, abre en otra pestaña. */
+/** Stellar Expert link, opens in a new tab. */
 export function ExplorerLink({
   kind,
   id,

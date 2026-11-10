@@ -4,7 +4,7 @@
 
 @layer base {
   :root {
-    /* Manrope no tiene la escritura etíope: el amárico cae en Noto Sans Ethiopic. */
+    /* Manrope lacks the Ethiopic script: Amharic falls back to Noto Sans Ethiopic. */
     --font-manrope: 'Manrope', 'Noto Sans Ethiopic';
     --cb-bg-start: 246 244 240;
     --cb-bg-mid: 241 246 243;
@@ -149,8 +149,8 @@
 }
 
 /*
- * DaisyUI define `.btn-*` y otros nombres iguales a los nuestros y los pisa.
- * Dentro de `.app-page` (todas las páginas de la app) se restauran.
+ * DaisyUI defines `.btn-*` and other names identical to ours and overrides
+ * them. Inside `.app-page` (every page of the app) they are restored.
  */
 .app-page :is(.btn-primary, .btn-secondary) {
   outline: none;
@@ -178,7 +178,7 @@ footer a:focus-visible {
   outline-offset: 4px;
 }
 
-/* Tablas de administración: scroll horizontal en el celular, sin romper la página. */
+/* Admin tables: horizontal scroll on phones, without breaking the page. */
 .data-table {
   @apply w-full min-w-[640px] text-left text-sm;
 }

@@ -3,11 +3,12 @@ import { HttpException } from '@/exceptions/HttpException';
 type ErrorTable = Record<number, { status: number; code: string; message: string }>;
 
 /**
- * Códigos de error del contrato `traceability` (ver
+ * Error codes of the `traceability` contract (see
  * `contracts/traceability/src/types.rs`).
  *
- * Soroban los devuelve en la simulación como `Error(Contract, #N)`. Traducirlos
- * acá permite responder errores de dominio en vez de un fallo opaco de RPC.
+ * Soroban returns them during simulation as `Error(Contract, #N)`. Translating
+ * them here lets us respond with domain errors instead of an opaque RPC
+ * failure.
  */
 const TRACEABILITY_ERRORS: ErrorTable = {
   1: { status: 500, code: 'NOT_INITIALIZED', message: 'Contract not initialized' },
@@ -30,15 +31,15 @@ const TABLES: Record<ContractKind, ErrorTable> = {
   traceability: TRACEABILITY_ERRORS,
 };
 
-/** Extrae el `#N` de un `Error(Contract, #N)`. */
+/** Extracts the `#N` from an `Error(Contract, #N)`. */
 export function parseContractErrorCode(raw: string): number | null {
   const match = /Error\(Contract, #(\d+)\)/.exec(raw);
   return match ? Number(match[1]) : null;
 }
 
 /**
- * Una entrada de storage archivada hace fallar la simulación hasta que alguien
- * la restaure. Se distingue explícitamente en vez de dejarla como error genérico.
+ * An archived storage entry makes the simulation fail until someone restores
+ * it. It is reported explicitly instead of as a generic error.
  */
 export function isArchivedStateError(raw: string): boolean {
   return /archived|ExceededLimit.*Storage|entry (is |has been )?expired/i.test(raw);

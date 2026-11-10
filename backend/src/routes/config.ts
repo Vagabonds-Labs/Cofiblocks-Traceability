@@ -8,8 +8,8 @@ const router = Router();
 /**
  * GET /api/config/stellar
  *
- * Lo que el frontend necesita para firmar contra la red correcta y armar los
- * enlaces al explorador.
+ * What the frontend needs to sign for the right network and build explorer
+ * links.
  */
 router.get('/stellar', async (_req: Request, res: Response) => {
   successResponse(res, {

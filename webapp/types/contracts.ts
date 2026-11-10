@@ -1,9 +1,9 @@
-/** Transacción que arma el backend, ya simulada, para que la firme la wallet. */
+/** Transaction built by the backend, already simulated, for the wallet to sign. */
 export interface PreparedTransaction {
-  /** Sobre de transacción en base64. */
+  /** Base64 transaction envelope. */
   xdr: string
-  /** La wallet lo necesita para firmar contra la red correcta. */
+  /** The wallet needs it to sign for the right network. */
   network_passphrase: string
-  /** Unix timestamp en segundos; después de esto la transacción no entra. */
+  /** Unix timestamp in seconds; after this the transaction is no longer accepted. */
   valid_until: number
 }

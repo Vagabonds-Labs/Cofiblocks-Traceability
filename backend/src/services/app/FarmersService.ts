@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { parseCsv } from '@/utils/csv';
 
-/** Encabezados que acepta la importación. Sólo los dos primeros son obligatorios. */
+/** Headers accepted by the import. Only the first two are required. */
 export const FARMER_CSV_COLUMNS = [
   'coop_code',
   'farmer_id',
@@ -16,11 +16,11 @@ export const FARMER_CSV_COLUMNS = [
 
 const REQUIRED_COLUMNS = ['coop_code', 'farmer_id'] as const;
 
-/** Largo máximo de un ID de cooperativa: el `farmer_ref` on-chain tiene tope 64. */
+/** Maximum length of a cooperative ID: the on-chain `farmer_ref` is capped at 64. */
 const MAX_FARMER_ID_LEN = 48;
 
 export interface ImportRowError {
-  /** Número de línea del CSV, contando el encabezado como línea 1. */
+  /** CSV line number, counting the header as line 1. */
   line: number;
   message: string;
 }
@@ -34,30 +34,31 @@ export interface ImportResult {
 }
 
 /**
- * ID on-chain del caficultor: el código de la cooperativa más su ID.
+ * The farmer's on-chain ID: the cooperative code plus their ID.
  *
- * Los IDs que asigna cada cooperativa sólo son únicos dentro de ella; con el
- * prefijo (`KK-ID123`) son únicos en todo el piloto.
+ * The IDs each cooperative assigns are only unique within it; with the prefix
+ * (`KK-ID123`) they are unique across the whole pilot.
  */
 export function buildFarmerRef(coopCode: string, coopFarmerId: string): string {
   return `${coopCode}-${coopFarmerId}`;
 }
 
-/** Normaliza un ID tal como lo escribe el caficultor: sin espacios y en mayúsculas. */
+/** Normalizes an ID as typed by the farmer: no spaces, upper case. */
 export function normalizeFarmerId(value: string): string {
   return value.replace(/\s+/g, '').toUpperCase();
 }
 
 /**
- * Importa (o actualiza) la lista de caficultores que entrega la cooperativa.
+ * Imports (or updates) the farmer list provided by the cooperative.
  *
- * - Es idempotente: la clave es (cooperativa, ID). Volver a subir el mismo
- *   archivo no crea duplicados.
- * - Nunca toca el vínculo con Telegram ni la wallet: eso lo hace el propio
- *   caficultor desde el bot.
- * - Con `dryRun` valida todo y dice qué haría, sin escribir.
- * - Si alguna fila tiene errores no se escribe nada: el admin corrige el
- *   archivo y lo vuelve a subir.
+ * - It is idempotent: the key is (cooperative, ID). Uploading the same file
+ *   again does not create duplicates.
+ * - It never touches the Telegram link or the wallet: the farmer does that
+ *   through the bot.
+ * - With `dryRun` it validates everything and reports what it would do,
+ *   without writing.
+ * - If any row has errors nothing is written: the admin fixes the file and
+ *   uploads it again.
  */
 export async function importFarmersCsv(csv: string, dryRun: boolean): Promise<ImportResult> {
   const rows = parseCsv(csv);
@@ -159,7 +160,7 @@ export async function importFarmersCsv(csv: string, dryRun: boolean): Promise<Im
       toCreate.push({ ...row, status: FarmerStatus.PRELOADED });
       continue;
     }
-    // Un campo vacío en el CSV no borra lo que ya hay.
+    // An empty CSV field does not erase existing data.
     const data: Prisma.FarmerUncheckedUpdateInput = {};
     if (row.fullName && row.fullName !== current.fullName) data.fullName = row.fullName;
     if (row.phone && row.phone !== current.phone) data.phone = row.phone;
@@ -228,7 +229,7 @@ export async function listFarmers(filters: {
   ]);
   return {
     total,
-    // BigInt no se serializa a JSON: el id de Telegram viaja como texto.
+    // BigInt does not serialize to JSON: the Telegram ID travels as text.
     farmers: farmers.map((f) => ({ ...f, telegramUserId: f.telegramUserId?.toString() ?? null })),
     statusCounts: Object.fromEntries(byStatus.map((s) => [s.status, s._count._all])),
   };
@@ -239,11 +240,11 @@ export type LinkResult =
   | { ok: false; reason: 'NOT_FOUND' | 'LINKED_TO_OTHER_ACCOUNT' | 'TELEGRAM_ALREADY_REGISTERED' };
 
 /**
- * El bot vincula un chat de Telegram con un caficultor precargado.
+ * The bot links a Telegram chat to a pre-loaded farmer.
  *
- * Un caficultor sólo puede quedar vinculado a una cuenta de Telegram, y una
- * cuenta de Telegram a un solo caficultor. Si el ID ya está tomado por otra
- * cuenta, el caficultor tiene que hablar con su cooperativa.
+ * A farmer can only be linked to one Telegram account, and a Telegram account
+ * to a single farmer. If the ID is already taken by another account, the
+ * farmer has to talk to their cooperative.
  */
 export async function linkTelegram(params: {
   organizationId: string;
@@ -269,9 +270,9 @@ export async function linkTelegram(params: {
     return { ok: false, reason: 'LINKED_TO_OTHER_ACCOUNT' };
   }
 
-  // Si esta cuenta de Telegram estaba vinculada a otro caficultor que todavía
-  // no completó el registro (se equivocó de ID), se libera ese vínculo. Si ya
-  // completó el registro, no: lo tiene que resolver la cooperativa.
+  // If this Telegram account was linked to another farmer who has not finished
+  // registering (they typed the wrong ID), that link is released. If they had
+  // finished registering, it is not: the cooperative has to resolve it.
   const previous = await prisma.farmer.findUnique({ where: { telegramUserId: params.telegramUserId } });
   if (previous && previous.status !== FarmerStatus.LINKED) {
     return { ok: false, reason: 'TELEGRAM_ALREADY_REGISTERED' };

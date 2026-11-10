@@ -1,6 +1,6 @@
 [package]
 name = "traceability"
-description = "Trazabilidad de lotes de café de CofiBlocks"
+description = "CofiBlocks coffee batch traceability"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

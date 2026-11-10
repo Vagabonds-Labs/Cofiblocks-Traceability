@@ -23,11 +23,11 @@ const enum RouteType {
 const localePrefixPattern = new RegExp(`^/(${locales.join('|')})(?=/|$)`)
 
 /**
- * Prefijo de idioma de la ruta (`/es`) o vacío para el idioma por defecto.
+ * The route's language prefix (`/es`), or empty for the default language.
  *
- * Hay que sacarlo antes de clasificar la ruta: con `localePrefix: 'as-needed'`
- * la misma página vive en `/profile` y en `/es/profile`, y comparar la ruta
- * cruda dejaba todas las rutas con prefijo como públicas.
+ * It has to be stripped before classifying the route: with
+ * `localePrefix: 'as-needed'` the same page lives at `/profile` and at
+ * `/es/profile`, and comparing the raw path left every prefixed route public.
  */
 const localePrefixOf = (pathname: string) => pathname.match(localePrefixPattern)?.[0] ?? ''
 
@@ -44,7 +44,7 @@ const routeType = (pathname: string) => {
   }
 }
 
-/** Redirige conservando el idioma en el que venía el usuario. */
+/** Redirects while keeping the user's current language. */
 const redirectTo = (req: NextRequest, path: string) =>
   NextResponse.redirect(new URL(`${localePrefixOf(req.nextUrl.pathname)}${path}`, req.url))
 
@@ -66,8 +66,8 @@ export async function middleware(req: NextRequest) {
 
   const jwtSecret = process.env.JWT_SECRET
   if (!jwtSecret) {
-    // Sin clave ningún token verifica y toda ruta protegida termina en /login.
-    // Tiene que ser la misma que JWT_ACCESS_SECRET del backend.
+    // Without the secret no token verifies and every protected route ends at
+    // /login. It must match the backend's JWT_ACCESS_SECRET.
     console.error('JWT_SECRET is not set: protected routes will always redirect to /login')
   }
 
@@ -88,12 +88,12 @@ export async function middleware(req: NextRequest) {
       return redirectTo(req, '/')
     }
 
-    // 3️⃣ Si todo está bien → intl
+    // 3️⃣ If everything is fine → intl
     return intlMiddleware(req)
   } catch {
-    // Token vencido o firmado con otra clave. En /login hay que dejar pasar:
-    // redirigir a /login desde /login era un bucle infinito
-    // (ERR_TOO_MANY_REDIRECTS) que sólo se cortaba borrando las cookies.
+    // Expired token or one signed with another key. /login must be let
+    // through: redirecting to /login from /login was an infinite loop
+    // (ERR_TOO_MANY_REDIRECTS) that only clearing cookies would stop.
     if (route_type === RouteType.NOT_AUTHENTICATED) {
       return intlMiddleware(req)
     }

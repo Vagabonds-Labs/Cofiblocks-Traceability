@@ -20,19 +20,19 @@ function networkFromEnv(): Networks {
 }
 
 /**
- * Acceso a la wallet del usuario.
+ * Access to the user's wallet.
  *
- * El backend arma y simula la transacción entera, la wallet sólo la firma, y el
- * backend la envía con fee-bump. Por eso el servicio devuelve el XDR firmado en
- * vez de un hash: el hash lo saca el backend del submit, que es más confiable
- * que confiar en el que reporte el cliente.
+ * The backend builds and simulates the whole transaction, the wallet only
+ * signs it, and the backend submits it with fee-bump. That is why the service
+ * returns the signed XDR instead of a hash: the backend gets the hash from the
+ * submission, which is more reliable than trusting the one the client reports.
  *
- * Wallets soportadas: Freighter, xBull, Albedo, Lobstr y Rabet. WalletConnect
- * requiere `@reown/appkit` y un projectId de Reown; se agrega como un módulo más
- * en `init()` cuando esas dos cosas estén.
+ * Supported wallets: Freighter, xBull, Albedo, Lobstr and Rabet. WalletConnect
+ * needs `@reown/appkit` and a Reown projectId; it is added as one more module
+ * in `init()` once both are available.
  *
- * Los usuarios que entraron con Telegram o email (`walletProvider: 'cavos'`)
- * firman con su wallet de Cavos en vez del kit.
+ * Users who signed in with Telegram or email (`walletProvider: 'cavos'`) sign
+ * with their Cavos wallet instead of the kit.
  */
 class WalletService {
   private initialized = false;
@@ -41,7 +41,7 @@ class WalletService {
     return authService.getCurrentUser()?.walletProvider === "cavos";
   }
 
-  /** Idempotente: el kit se inicializa una sola vez, y sólo en el browser. */
+  /** Idempotent: the kit is initialized only once, and only in the browser. */
   private init(): void {
     if (this.initialized || typeof window === "undefined") return;
 
@@ -70,7 +70,7 @@ class WalletService {
     window.localStorage.removeItem(SELECTED_WALLET_KEY);
   }
 
-  /** Abre el modal de selección y devuelve la dirección conectada. */
+  /** Opens the selection modal and returns the connected address. */
   async connect(): Promise<string> {
     this.init();
     const { address } = await StellarWalletsKit.authModal();
@@ -79,7 +79,7 @@ class WalletService {
     return address;
   }
 
-  /** Reconecta en silencio si el usuario ya había elegido una wallet. */
+  /** Reconnects silently if the user had already chosen a wallet. */
   async trySilent(): Promise<string | null> {
     if (typeof window === "undefined") return null;
     if (!window.localStorage.getItem(SELECTED_WALLET_KEY)) return null;
@@ -100,8 +100,8 @@ class WalletService {
   }
 
   async disconnect(): Promise<void> {
-    // Cerrar también la sesión de Cavos: si no, el próximo "continuar con
-    // Telegram o email" entraría directo con la cuenta anterior.
+    // Close the Cavos session too: otherwise the next "continue with Telegram
+    // or email" would sign straight in with the previous account.
     await cavosSigner.logout().catch((err) => console.error("Cavos logout error:", err));
     this.init();
     try {
@@ -112,11 +112,11 @@ class WalletService {
   }
 
   /**
-   * Exige que la wallet conectada sea la de la sesión.
+   * Requires the connected wallet to be the session's wallet.
    *
-   * Si el usuario cambió de cuenta en la extensión, firmaría con una dirección
-   * que no es la del pedido y el `require_auth` del contrato lo rechazaría —
-   * mejor cortar acá con un mensaje claro.
+   * If the user switched accounts in the extension, they would sign with an
+   * address that is not the one in the request, and the contract's
+   * `require_auth` would reject it — better to stop here with a clear message.
    */
   private async assertSessionWallet(): Promise<string> {
     const user = authService.getCurrentUser();
@@ -134,10 +134,10 @@ class WalletService {
   }
 
   /**
-   * Firma la transacción que armó el backend y devuelve el sobre firmado.
+   * Signs the transaction the backend built and returns the signed envelope.
    *
-   * El backend se encarga del envío: lo envuelve en un fee-bump y paga el fee,
-   * así el usuario nunca necesita XLM.
+   * The backend handles submission: it wraps it in a fee-bump and pays the
+   * fee, so the user never needs XLM.
    */
   async signTransaction(prepared: PreparedTransaction): Promise<string> {
     if (prepared.valid_until * 1000 < Date.now()) {
@@ -160,7 +160,7 @@ class WalletService {
     return signedTxXdr;
   }
 
-  /** Firma una transacción sin exigir que haya sesión en nuestro backend. */
+  /** Signs a transaction without requiring a session in our backend. */
   async signTransactionAs(prepared: PreparedTransaction, address: string): Promise<string> {
     if (this.isCavosUser() || cavosSigner.hasAddress(address)) {
       return cavosSigner.signTransaction(prepared.xdr, address);
@@ -173,7 +173,7 @@ class WalletService {
     return signedTxXdr;
   }
 
-  /** Firma un mensaje con formato SEP-53. Devuelve la firma en base64. */
+  /** Signs a message in SEP-53 format. Returns the base64 signature. */
   async signMessage(message: string, address: string): Promise<string> {
     this.init();
     const { signedMessage } = await StellarWalletsKit.signMessage(message, {

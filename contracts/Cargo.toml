@@ -20,7 +20,7 @@ panic = "abort"
 codegen-units = 1
 lto = true
 
-# Perfil usado por `stellar contract build` para artefactos de release con debug info.
+# Profile used by `stellar contract build` for release artifacts with debug info.
 [profile.release-with-logs]
 inherits = "release"
 debug-assertions = true

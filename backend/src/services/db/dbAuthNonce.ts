@@ -16,10 +16,11 @@ export class DbAuthNonce {
   }
 
   /**
-   * Marca el nonce como consumido y devuelve si era válido.
+   * Marks the nonce as consumed and returns whether it was valid.
    *
-   * El `updateMany` con `consumedAt: null` en el where hace que dos peticiones
-   * simultáneas no puedan consumir el mismo nonce: la segunda actualiza 0 filas.
+   * The `updateMany` with `consumedAt: null` in the where clause means two
+   * simultaneous requests cannot consume the same nonce: the second one
+   * updates 0 rows.
    */
   async consumeNonce(nonce: string): Promise<AuthNonceEntry | null> {
     const entry = await prisma.authNonce.findUnique({ where: { nonce } });
@@ -33,7 +34,7 @@ export class DbAuthNonce {
     return consumed.count === 1 ? entry : null;
   }
 
-  /** Limpieza de los que ya vencieron. */
+  /** Cleanup of expired nonces. */
   async deleteExpired(): Promise<number> {
     const result = await prisma.authNonce.deleteMany({
       where: { expiresAt: { lt: new Date() } },

@@ -18,7 +18,7 @@ export function getRpcUrl() {
   return contractFactory.getClient().deployment.rpcUrl;
 }
 
-/** Base del explorador de bloques (Stellar Expert) para la red actual. */
+/** Block explorer (Stellar Expert) base URL for the current network. */
 export function getExplorerBaseURL() {
   const network = getNetwork() === 'mainnet' ? 'public' : 'testnet';
   return `https://stellar.expert/explorer/${network}`;

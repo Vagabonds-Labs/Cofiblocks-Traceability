@@ -1,15 +1,15 @@
 import jwt from 'jsonwebtoken';
 import { TokenPayload, TokenPair } from './types/Auth';
 
-/** Largo mínimo de cada secreto: 32 bytes en hex o base64 superan este piso. */
+/** Minimum length of each secret: 32 bytes in hex or base64 clear this bar. */
 const MIN_SECRET_LENGTH = 32;
 
 /**
- * Lee y valida los secretos de las sesiones.
+ * Reads and validates the session secrets.
  *
- * Antes, si faltaban, se usaban cadenas fijas del repositorio: cualquiera que
- * las leyera podía firmar un token con `is_admin: true`. Ahora el backend no
- * arranca sin secretos propios, largos y distintos entre sí.
+ * Previously, if they were missing, fixed strings from the repository were
+ * used: anyone who read them could sign a token with `is_admin: true`. Now the
+ * backend does not start without its own long, distinct secrets.
  */
 export function readJwtSecrets(env: NodeJS.ProcessEnv = process.env): { access: string; refresh: string } {
   const access = env.JWT_ACCESS_SECRET ?? '';
@@ -46,8 +46,9 @@ export class JwtService {
   /**
    * Generate access token (short-lived)
    *
-   * Lleva el `sessionId`: el middleware comprueba en cada pedido que esa sesión
-   * siga activa, así cerrar sesión o revocarla corta el acceso al instante.
+   * It carries the `sessionId`: the middleware checks on every request that
+   * the session is still active, so logging out or revoking it cuts access
+   * immediately.
    */
   generateAccessToken(payload: TokenPayload & { sessionId: string }): string {
     return jwt.sign(
@@ -129,8 +130,8 @@ export class JwtService {
     try {
       const decoded = jwt.verify(token, this.accessTokenSecret) as jwt.JwtPayload;
 
-      // Los tokens emitidos antes de este cambio no traen sesión: se rechazan y
-      // el usuario vuelve a entrar.
+      // Tokens issued before this change carry no session: they are rejected
+      // and the user signs in again.
       if (decoded.type !== 'access' || typeof decoded.sessionId !== 'string') {
         return null;
       }

@@ -1,8 +1,8 @@
-//! Eventos del contrato de trazabilidad.
+//! Events of the traceability contract.
 //!
-//! El backend los indexa para armar la línea de tiempo de cada lote y para
-//! mandar los avisos del bot. Con `#[contractevent]` la sección de datos es un
-//! mapa indexado por nombre de campo.
+//! The backend indexes them to build each batch's timeline and to send
+//! notifications to farmers. With `#[contractevent]` the data section is a map
+//! keyed by field name.
 
 use soroban_sdk::{contractevent, Address, BytesN, String};
 

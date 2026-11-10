@@ -29,8 +29,8 @@ export async function refreshAccessToken(refreshToken: string): Promise<{ access
       throw new HttpException(401, 'Refresh token expired');
     }
 
-    // Toda sesión emitida tiene su refresh token ligado. Sin sesión, o con la
-    // sesión cerrada, no se renueva.
+    // Every issued session has its refresh token linked. Without a session, or
+    // with a closed one, the token is not renewed.
     if (!tokenRecord.sessionId || !tokenRecord.session || !tokenRecord.session.isActive) {
       throw new HttpException(401, 'Session has been revoked');
     }
@@ -98,11 +98,13 @@ export async function getUserSessions(userId: string): Promise<SessionEntry[]> {
 }
 
 /**
- * Usuario con sus permisos actuales, si la sesión del token sigue activa.
+ * The user with their current permissions, if the token's session is still
+ * active.
  *
- * El middleware lo consulta en cada pedido en vez de confiar en el token: así
- * cerrar sesión, revocarla, borrar al usuario o quitarle el admin tiene efecto
- * inmediato, sin esperar a que venza el access token.
+ * The middleware checks this on every request instead of trusting the token:
+ * that way logging out, revoking the session, deleting the user or removing
+ * their admin rights takes effect immediately, without waiting for the access
+ * token to expire.
  */
 export async function getActiveSessionUser(sessionId: string, userId: string) {
   return await dbSessions.findActiveSessionWithUser(sessionId, userId);
@@ -114,8 +116,8 @@ export async function revokeAllUserSessions(userId: string): Promise<void> {
 }
 
 /**
- * Revoca una sesión del usuario. Si el ID no es de una sesión suya (ajena o
- * inexistente) responde 404 sin tocar nada.
+ * Revokes one of the user's sessions. If the ID is not one of their sessions
+ * (someone else's or non-existent) it responds 404 without touching anything.
  */
 export async function revokeSession(sessionId: string, userId: string): Promise<void> {
   const deleted = await dbSessions.deleteUserSession(sessionId, userId);

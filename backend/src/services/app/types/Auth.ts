@@ -7,7 +7,7 @@ export interface TokenPayload {
     userId: string;
     walletAddress: string;
     is_admin: boolean;
-    /** Rol del personal en el piloto, o `null` si todavía no tiene. */
+    /** Staff role in the pilot, or `null` if they do not have one yet. */
     role: string | null;
     organization_id: string | null;
 }

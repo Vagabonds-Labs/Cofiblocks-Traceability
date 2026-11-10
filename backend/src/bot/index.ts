@@ -7,14 +7,17 @@ import { createBot } from './bot';
 export const TELEGRAM_WEBHOOK_PATH = '/api/telegram/webhook';
 
 /**
- * Arranca el bot de los caficultores, si está configurado.
+ * Starts the farmers' bot, if it is configured.
  *
- * - Sin `TELEGRAM_BOT_TOKEN` el bot queda apagado y el resto del backend
- *   funciona igual.
- * - Con `TELEGRAM_WEBHOOK_URL` (producción/staging) Telegram le manda los
- *   mensajes a `POST /api/telegram/webhook`, firmados con
+ * Prototype from week 0: VoiceLedger now builds the farmer bot, so this one
+ * stays off in practice.
+ *
+ * - Without `TELEGRAM_BOT_TOKEN` the bot stays off and the rest of the backend
+ *   works the same.
+ * - With `TELEGRAM_WEBHOOK_URL` (production/staging) Telegram sends the
+ *   messages to `POST /api/telegram/webhook`, signed with
  *   `TELEGRAM_WEBHOOK_SECRET`.
- * - Sin webhook (desarrollo local) el bot hace long polling.
+ * - Without a webhook (local development) the bot uses long polling.
  */
 export async function startTelegramBot(app: Express): Promise<void> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -42,8 +45,8 @@ export async function startTelegramBot(app: Express): Promise<void> {
     return;
   }
 
-  // Long polling: si quedó un webhook de otro entorno, Telegram no entrega
-  // updates por polling hasta que se borra.
+  // Long polling: if a webhook from another environment is still set,
+  // Telegram does not deliver updates by polling until it is deleted.
   await bot.api.deleteWebhook();
   bot.start({ onStart: (info) => logger.info(`Telegram bot @${info.username} polling for updates`) });
 }

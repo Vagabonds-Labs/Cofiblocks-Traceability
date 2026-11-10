@@ -12,38 +12,38 @@ import { StellarClient } from './StellarClient';
 import { ContractKind, toDomainError } from './errors';
 import { PreparedTransaction } from './types/transactions';
 
-/** Cuánto vale una transacción preparada antes de que haya que volver a pedirla. */
+/** How long a prepared transaction stays valid before it has to be requested again. */
 const DEFAULT_VALIDITY_SECONDS = 5 * 60;
 
-/** Fee base por operación, en stroops. El fee-bump lo termina de cubrir. */
+/** Base fee per operation, in stroops. The fee-bump covers the rest. */
 const BASE_FEE = '1000';
 
 export interface InvocationRequest {
   contractId: string;
   method: string;
   args?: xdr.ScVal[];
-  /** Contrato al que pertenece el método, para traducir sus códigos de error. */
+  /** Contract the method belongs to, used to translate its error codes. */
   kind?: ContractKind;
 }
 
 /**
- * Construye, simula y devuelve transacciones listas para firmar.
+ * Builds, simulates and returns transactions ready to sign.
  *
- * El backend arma la transacción entera, la simula para obtener footprint,
- * entradas de auth y fee, y devuelve el XDR.
+ * The backend builds the whole transaction, simulates it to get the
+ * footprint, auth entries and fee, and returns the XDR.
  *
- * **El usuario es siempre la source account.** Así el `require_auth` del
- * contrato se resuelve con credenciales `SOURCE_ACCOUNT` y no hay que firmar
- * entradas de autorización por separado.
+ * **The user is always the source account.** That way the contract's
+ * `require_auth` is satisfied with `SOURCE_ACCOUNT` credentials and there are
+ * no separate authorization entries to sign.
  */
 export class TxBuilder {
   constructor(private readonly client: StellarClient) {}
 
-  /** Lectura: se simula y se devuelve el valor, sin tocar la red de escritura. */
+  /** Read: simulates and returns the value, without writing to the network. */
   public async read<T = unknown>(request: InvocationRequest): Promise<T> {
     const tx = this.buildUnsigned(
-      // La simulación no valida la secuencia ni exige que la cuenta exista:
-      // leer no tiene por qué depender de la clave secreta del backend.
+      // Simulation does not check the sequence or require the account to exist:
+      // reading should not depend on the backend's secret key.
       new Account(this.client.getReadSourceAddress(), '0'),
       request,
       DEFAULT_VALIDITY_SECONDS
@@ -60,8 +60,8 @@ export class TxBuilder {
   }
 
   /**
-   * Escritura que firma el usuario: devuelve el XDR simulado para que la wallet
-   * lo firme (SEP-43 `signTransaction`).
+   * Write signed by the user: returns the simulated XDR for the wallet to sign
+   * (SEP-43 `signTransaction`).
    */
   public async prepare(
     source: string,
@@ -86,8 +86,8 @@ export class TxBuilder {
   }
 
   /**
-   * Escritura que firma el backend con su propia cuenta (asignación de roles,
-   * vínculo de caficultores). Devuelve la transacción firmada lista para enviar.
+   * Write signed by the backend with its own account (role assignment, farmer
+   * linking). Returns the signed transaction, ready to submit.
    */
   public async prepareAsService(
     request: InvocationRequest,
@@ -127,16 +127,16 @@ export class TxBuilder {
     request: InvocationRequest
   ): void {
     if (rpc.Api.isSimulationError(simulation)) {
-      // `debug` y no `error`: el errorHandler ya loguea la HttpException que
-      // sale de acá, y hay fallos esperables (leer el saldo de una cuenta sin
-      // trustline) que no deberían ensuciar el log de errores.
+      // `debug`, not `error`: the errorHandler already logs the HttpException
+      // thrown from here, and some failures are expected (reading the balance
+      // of an account without a trustline) and should not clutter the error log.
       logger.debug(
         { method: request.method, contract: request.contractId, error: simulation.error },
         'Soroban simulation failed'
       );
       throw toDomainError(simulation.error, request.kind);
     }
-    // La simulación pide restaurar entradas archivadas antes de poder ejecutar.
+    // The simulation asks to restore archived entries before it can run.
     if (rpc.Api.isSimulationRestore(simulation)) {
       logger.warn(
         { method: request.method, contract: request.contractId },

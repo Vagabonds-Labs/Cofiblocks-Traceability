@@ -1,8 +1,8 @@
 use soroban_sdk::{contracterror, contracttype, Address, BytesN, String, Vec};
 
-/// Rol de una cuenta dentro del piloto.
+/// An account's role within the pilot.
 ///
-/// El orden importa: es el que usa el backend al serializar el rol.
+/// The order matters: it is what the backend uses when serializing the role.
 #[contracttype]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(u32)]
@@ -15,7 +15,7 @@ pub enum Role {
     ExportManager = 5,
 }
 
-/// Etapa de un lote. Avanza siempre hacia adelante (ver `Stage::can_follow`).
+/// A batch's stage. It always moves forward (see `Stage::can_follow`).
 #[contracttype]
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 #[repr(u32)]
@@ -31,17 +31,17 @@ pub enum Stage {
 }
 
 impl Stage {
-    /// `true` si `self` puede venir inmediatamente después de `previous`.
+    /// `true` if `self` can come right after `previous`.
     ///
-    /// La única etapa que se puede saltear es `Fermentation`: el PDF del piloto
-    /// la nombra en una lista y no en la otra, así que queda opcional hasta que
-    /// Etiopía confirme.
+    /// The only stage that can be skipped is `Fermentation`: the pilot PDF
+    /// names it in one list but not in the other, so it stays optional until
+    /// Ethiopia confirms.
     pub fn can_follow(self, previous: Stage) -> bool {
         let next = previous as u32 + 1;
         self as u32 == next || (previous == Stage::Washing && self == Stage::Drying)
     }
 
-    /// `true` si `role` puede llevar un lote a esta etapa.
+    /// `true` if `role` can move a batch to this stage.
     pub fn allows(self, role: Role) -> bool {
         match self {
             Stage::Received => role == Role::Collector,
@@ -53,10 +53,10 @@ impl Stage {
     }
 }
 
-/// Rol de una cuenta y la organización a la que pertenece.
+/// An account's role and the organization it belongs to.
 ///
-/// `org` es el id numérico que asigna el backend: una cooperativa, o la unión
-/// en el caso del Export Manager. El contrato no conoce nombres; sólo compara.
+/// `org` is the numeric ID assigned by the backend: a cooperative, or the union
+/// for the Export Manager. The contract knows no names; it only compares.
 #[contracttype]
 #[derive(Clone, Debug, PartialEq)]
 pub struct Member {
@@ -64,35 +64,35 @@ pub struct Member {
     pub org: u32,
 }
 
-/// Vínculo entre la wallet de un caficultor y su ID seudónimo de cooperativa.
+/// Link between a farmer's wallet and their pseudonymous cooperative ID.
 #[contracttype]
 #[derive(Clone, Debug, PartialEq)]
 pub struct Farmer {
     pub farmer_ref: String,
     pub coop: u32,
-    /// Hash (SHA-256) del consentimiento y las declaraciones EUDR que firmó.
-    /// `None` hasta que firma.
+    /// Hash (SHA-256) of the EUDR consent and declarations they signed.
+    /// `None` until they sign.
     pub consent_hash: Option<BytesN<32>>,
     pub consent_at: u64,
 }
 
-/// Una entrada del historial de un lote.
+/// An entry in a batch's history.
 #[contracttype]
 #[derive(Clone, Debug, PartialEq)]
 pub struct StageRecord {
     pub stage: Stage,
     pub actor: Address,
     pub timestamp: u64,
-    /// Hash (SHA-256) del registro completo de la etapa, que vive off-chain.
+    /// Hash (SHA-256) of the stage's full record, which lives off chain.
     pub data_hash: BytesN<32>,
 }
 
 #[contracttype]
 #[derive(Clone, Debug, PartialEq)]
 pub struct Batch {
-    /// Número de lote, p. ej. `22-10-2026 ID123`.
+    /// Batch number, e.g. `22-10-2026 ID123`.
     pub id: String,
-    /// ID seudónimo del caficultor asignado por la cooperativa.
+    /// The farmer's pseudonymous ID assigned by the cooperative.
     pub farmer_ref: String,
     pub coop: u32,
     pub collection_center: u32,
@@ -108,7 +108,7 @@ pub enum DataKey {
     Admin,
     Member(Address),
     Farmer(Address),
-    /// `farmer_ref` → wallet, para que un mismo ID no quede en dos wallets.
+    /// `farmer_ref` → wallet, so the same ID cannot end up on two wallets.
     FarmerRef(String),
     Batch(String),
 }
@@ -118,22 +118,22 @@ pub enum DataKey {
 #[repr(u32)]
 pub enum Error {
     NotInitialized = 1,
-    /// La cuenta no tiene rol asignado.
+    /// The account has no role assigned.
     NotAMember = 2,
-    /// El rol de la cuenta no permite esta operación.
+    /// The account's role does not allow this operation.
     Unauthorized = 3,
-    /// La cuenta pertenece a otra cooperativa que la del lote.
+    /// The account belongs to a different cooperative than the batch.
     WrongOrganization = 4,
-    /// Para registrar un caficultor hay que usar `register_farmer`.
+    /// Registering a farmer requires `register_farmer`.
     UseRegisterFarmer = 5,
     FarmerNotFound = 6,
-    /// El `farmer_ref` ya está vinculado a otra wallet.
+    /// The `farmer_ref` is already linked to another wallet.
     FarmerRefTaken = 7,
     BatchAlreadyExists = 8,
     BatchNotFound = 9,
-    /// La etapa no puede seguir a la etapa actual del lote.
+    /// The stage cannot follow the batch's current stage.
     InvalidTransition = 10,
     InvalidWeight = 11,
-    /// Texto vacío o más largo que `MAX_ID_LEN`.
+    /// Empty text or longer than `MAX_ID_LEN`.
     InvalidId = 12,
 }

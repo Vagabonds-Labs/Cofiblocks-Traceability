@@ -24,7 +24,7 @@ const PORT = process.env.PORT || 4000;
 app.use(requestId);
 app.use(withLogger);
 
-// Orígenes del frontend. `FRONTEND_URL` suma el de cada entorno (staging).
+// Frontend origins. `FRONTEND_URL` adds each environment's origin (staging).
 const allowedOrigins = [
   "http://localhost:3000",
   ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : []),
@@ -88,7 +88,7 @@ app.use("/api/config", configRoute);
 app.use("/api/organizations", organizationsRoute);
 
 async function main() {
-  // El webhook del bot se registra antes del manejador de errores.
+  // The bot webhook is registered before the error handler.
   await startTelegramBot(app);
 
   // Error handling middleware (must be last)

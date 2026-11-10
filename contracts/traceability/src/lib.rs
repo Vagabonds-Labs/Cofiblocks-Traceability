@@ -1,16 +1,16 @@
 #![no_std]
-//! Trazabilidad de lotes de café de CofiBlocks (piloto Etiopía).
+//! CofiBlocks coffee batch traceability (Ethiopia pilot).
 //!
-//! Qué guarda y qué no:
+//! What it stores and what it does not:
 //!
-//! * **Nada personal.** Los caficultores se identifican con el ID seudónimo que
-//!   les asigna la cooperativa (`farmer_ref`). Nombres, teléfonos, GPS y
-//!   documentos viven off-chain.
-//! * **Hashes de los registros completos.** Cada etapa guarda el SHA-256 del
-//!   registro off-chain (`data_hash`). Recalcularlo y compararlo prueba que el
-//!   registro no se alteró.
-//! * **Quién hizo qué.** Cada cambio lo firma la cuenta del actor, y el
-//!   contrato valida que su rol y su organización le permitan hacerlo.
+//! * **Nothing personal.** Farmers are identified by the pseudonymous ID their
+//!   cooperative assigns them (`farmer_ref`). Names, phone numbers, GPS points
+//!   and documents live off chain.
+//! * **Hashes of the full records.** Each stage stores the SHA-256 of the
+//!   off-chain record (`data_hash`). Recomputing and comparing it proves the
+//!   record was not altered.
+//! * **Who did what.** Each change is signed by the actor's account, and the
+//!   contract checks that their role and organization allow it.
 
 mod events;
 mod storage;
@@ -23,7 +23,7 @@ use soroban_sdk::{contract, contractimpl, Address, BytesN, Env, String, Vec};
 
 pub use crate::types::{Batch, DataKey, Error, Farmer, Member, Role, Stage, StageRecord};
 
-/// Largo máximo de un número de lote o de un `farmer_ref`.
+/// Maximum length of a batch number or a `farmer_ref`.
 pub const MAX_ID_LEN: u32 = 64;
 
 #[contract]
@@ -38,9 +38,9 @@ impl Traceability {
 
     // ── roles ─────────────────────────────────────────────────────────────
 
-    /// Asigna un rol de personal (todos menos `Farmer`) dentro de `org`.
+    /// Assigns a staff role (anything but `Farmer`) within `org`.
     ///
-    /// Una cuenta tiene un solo rol: asignar otro reemplaza el anterior.
+    /// An account has a single role: assigning another replaces the previous one.
     pub fn grant_role(env: Env, account: Address, role: Role, org: u32) -> Result<(), Error> {
         Self::require_admin(&env)?;
         if role == Role::Farmer {
@@ -54,8 +54,8 @@ impl Traceability {
         Ok(())
     }
 
-    /// Quita el rol de la cuenta. Si era caficultor, libera también su
-    /// `farmer_ref` para que se pueda vincular a otra wallet.
+    /// Removes the account's role. If it was a farmer, it also frees their
+    /// `farmer_ref` so it can be linked to another wallet.
     pub fn revoke_role(env: Env, account: Address) -> Result<(), Error> {
         Self::require_admin(&env)?;
         storage::get_member(&env, &account).ok_or(Error::NotAMember)?;
@@ -73,11 +73,11 @@ impl Traceability {
 
     // ── caficultores ──────────────────────────────────────────────────────
 
-    /// Vincula la wallet de un caficultor con su ID de cooperativa.
+    /// Links a farmer's wallet to their cooperative ID.
     ///
-    /// Lo firma el admin (el backend) después de que el bot validó el ID contra
-    /// la lista de la cooperativa. Volver a llamarlo para la misma wallet y el
-    /// mismo ID es inofensivo; un ID ya vinculado a otra wallet se rechaza.
+    /// Signed by the admin (the backend) after the bot checked the ID against
+    /// the cooperative's list. Calling it again for the same wallet and ID is
+    /// harmless; an ID already linked to another wallet is rejected.
     pub fn register_farmer(
         env: Env,
         account: Address,
@@ -125,11 +125,11 @@ impl Traceability {
         Ok(())
     }
 
-    /// El caficultor firma el consentimiento GDPR/EUDR y sus declaraciones.
+    /// The farmer signs the GDPR/EUDR consent and its declarations.
     ///
-    /// `consent_hash` es el SHA-256 del texto aceptado y las declaraciones
-    /// marcadas. Volver a firmar reemplaza el anterior (p. ej. una versión
-    /// nueva del texto); el historial queda en los eventos.
+    /// `consent_hash` is the SHA-256 of the accepted text and the checked
+    /// declarations. Signing again replaces the previous one (e.g. a new
+    /// version of the text); the history stays in the events.
     pub fn record_consent(env: Env, farmer: Address, consent_hash: BytesN<32>) -> Result<(), Error> {
         farmer.require_auth();
         storage::extend_instance(&env);
@@ -156,12 +156,12 @@ impl Traceability {
 
     // ── lotes ─────────────────────────────────────────────────────────────
 
-    /// El Coffee Collector registra una entrega. El lote nace en `Received` y
-    /// pertenece a la cooperativa del collector.
+    /// The Coffee Collector records a delivery. The batch starts in `Received`
+    /// and belongs to the collector's cooperative.
     ///
-    /// No exige que el caficultor ya esté registrado on-chain: durante el
-    /// piloto hay entregas de caficultores que todavía no terminaron el
-    /// registro por el bot. El vínculo se resuelve por `farmer_ref`.
+    /// It does not require the farmer to be registered on chain yet: during
+    /// the pilot some farmers deliver before finishing registration through the
+    /// bot. The link is resolved by `farmer_ref`.
     pub fn create_batch(
         env: Env,
         actor: Address,
@@ -219,12 +219,12 @@ impl Traceability {
         Ok(())
     }
 
-    /// Lleva un lote a la etapa siguiente.
+    /// Moves a batch to the next stage.
     ///
-    /// Valida que la transición sea válida (`Stage::can_follow`), que el rol del
-    /// actor pueda mover el lote a esa etapa (`Stage::allows`) y que pertenezca
-    /// a la cooperativa del lote. El Export Manager opera a nivel de unión, así
-    /// que puede mover lotes de cualquier cooperativa.
+    /// Checks that the transition is valid (`Stage::can_follow`), that the
+    /// actor's role can move the batch to that stage (`Stage::allows`) and that
+    /// the actor belongs to the batch's cooperative. The Export Manager works at
+    /// union level, so they can move batches from any cooperative.
     pub fn advance_stage(
         env: Env,
         actor: Address,
@@ -269,7 +269,7 @@ impl Traceability {
         storage::get_batch(&env, &id)
     }
 
-    // ── administración ────────────────────────────────────────────────────
+    // ── administration ────────────────────────────────────────────────────
 
     pub fn get_admin(env: Env) -> Result<Address, Error> {
         storage::get_admin(&env)

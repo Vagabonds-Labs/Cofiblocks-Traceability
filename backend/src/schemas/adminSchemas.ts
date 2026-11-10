@@ -6,7 +6,7 @@ const userIdParams = z.object({
   userId: z.string().uuid('Invalid user ID format'),
 });
 
-/** Asignar un rol del piloto. El Collector necesita además su centro de acopio. */
+/** Assign a pilot role. The Collector also needs their collection center. */
 export const assignRoleSchema = z.object({
   params: userIdParams,
   body: z
@@ -25,7 +25,7 @@ export const revokeRoleSchema = z.object({
   params: userIdParams,
 });
 
-/** El CSV viaja como texto en el body: 200 caficultores entran holgados. */
+/** The CSV travels as text in the body: 200 farmers fit comfortably. */
 export const importFarmersSchema = z.object({
   body: z.object({
     csv: z.string().min(1, 'csv is required').max(2_000_000),

@@ -1,14 +1,14 @@
-/** Lo que el backend le devuelve al frontend para que la wallet firme. */
+/** What the backend returns to the frontend for the wallet to sign. */
 export interface PreparedTransaction {
-	/** Sobre de transacción en base64, ya simulado (footprint, auth y fee dentro). */
+	/** Base64 transaction envelope, already simulated (footprint, auth and fee included). */
 	xdr: string;
-	/** La wallet lo necesita para firmar contra la red correcta. */
+	/** The wallet needs it to sign for the right network. */
 	network_passphrase: string;
-	/** Unix timestamp en segundos: después de esto la transacción ya no entra. */
+	/** Unix timestamp in seconds: after this the transaction is no longer accepted. */
 	valid_until: number;
 }
 
-/** Resultado de enviar una transacción. */
+/** Result of submitting a transaction. */
 export interface SubmittedTransaction {
 	hash: string;
 	ledger: number;

@@ -269,7 +269,7 @@ function RoleDialog({
   const needsCenter = role === 'COLLECTOR'
   const canSave = !!role && !!organization && (!needsCenter || !!centerId) && !saving
 
-  // Si cambia el rol a uno de otro tipo de organización, la elegida deja de valer.
+  // If the role changes to one for another kind of organization, the chosen one no longer applies.
   useEffect(() => {
     if (organizationId && !options.some((o) => o.id === organizationId)) {
       setOrganizationId(options.length === 1 ? options[0].id : '')

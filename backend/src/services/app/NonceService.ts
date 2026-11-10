@@ -6,22 +6,23 @@ import { isClassicAddress } from '@/lib/StellarContracts/utils';
 
 const dbAuthNonce = new DbAuthNonce();
 
-/** Ventana corta: el usuario firma en el momento o pide otro. */
+/** Short window: the user signs right away or requests a new one. */
 const NONCE_TTL_SECONDS = 5 * 60;
 
 export interface IssuedNonce {
   nonce: string;
-  /** El mensaje literal que la wallet tiene que firmar, formato SEP-53. */
+  /** The literal message the wallet has to sign, SEP-53 format. */
   message: string;
   expires_at: number;
 }
 
 /**
- * Emite un nonce de un solo uso para el login por firma.
+ * Issues a single-use nonce for signature login.
  *
- * Antes lo generaba el cliente (`Date.now()-random` en `webapp/utils/signature.ts`)
- * y el backend nunca lo emitía ni lo invalidaba, así que una misma firma servía
- * para siempre. Ahora sale de acá, vence en 5 minutos y se consume una vez.
+ * Previously the client generated it (`Date.now()-random` in
+ * `webapp/utils/signature.ts`) and the backend never issued or invalidated it,
+ * so the same signature worked forever. Now it comes from here, expires in 5
+ * minutes and can be used once.
  */
 export async function issueNonce(walletAddress?: string): Promise<IssuedNonce> {
   if (walletAddress && !isClassicAddress(walletAddress)) {
@@ -43,13 +44,14 @@ export async function issueNonce(walletAddress?: string): Promise<IssuedNonce> {
   };
 }
 
-/** El mensaje que se firma. Legible para que el usuario vea qué está firmando. */
+/** The message that gets signed. Human-readable so the user sees what they sign. */
 export function buildLoginMessage(nonce: string): string {
   return `CofiBlocks login\nnonce: ${nonce}`;
 }
 
 /**
- * Consume el nonce. Falla si no lo emitió el backend, si ya se usó o si venció.
+ * Consumes the nonce. Fails if the backend did not issue it, if it was already
+ * used or if it expired.
  */
 export async function consumeNonce(nonce: string, walletAddress: string): Promise<void> {
   const entry = await dbAuthNonce.consumeNonce(nonce);

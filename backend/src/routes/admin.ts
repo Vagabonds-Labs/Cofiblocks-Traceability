@@ -20,7 +20,7 @@ router.use(authenticate, requireAdmin);
 
 /**
  * PUT /api/admin/users/:userId/role
- * Asigna el rol del piloto: lo escribe en el contrato y después en la base.
+ * Assigns the pilot role: writes it to the contract, then to the database.
  */
 router.put('/users/:userId/role', validate(assignRoleSchema), async (req: Request, res: Response) => {
   const { role, organizationId, collectionCenterId } = req.body as AssignRoleRequest;
@@ -39,7 +39,7 @@ router.delete('/users/:userId/role', validate(revokeRoleSchema), async (req: Req
   successResponse(res, result, 'Role revoked', 200);
 });
 
-/** GET /api/admin/farmers — lista con filtros y conteo por estado. */
+/** GET /api/admin/farmers — list with filters and counts per status. */
 router.get('/farmers', validate(listFarmersSchema), async (req: Request, res: Response) => {
   const query = req.query as unknown as ListFarmersQuery;
   const result = await FarmersService.listFarmers({
@@ -54,8 +54,8 @@ router.get('/farmers', validate(listFarmersSchema), async (req: Request, res: Re
 
 /**
  * POST /api/admin/farmers/import
- * Importa la lista de caficultores de la cooperativa (CSV como texto).
- * Con `dryRun: true` sólo valida y dice qué haría.
+ * Imports the cooperative's farmer list (CSV as text).
+ * With `dryRun: true` it only validates and reports what it would do.
  */
 router.post('/farmers/import', validate(importFarmersSchema), async (req: Request, res: Response) => {
   const { csv, dryRun } = req.body as ImportFarmersRequest;

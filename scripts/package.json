@@ -1,7 +1,7 @@
 {
   "name": "cofiblocks-traceability-scripts",
   "private": true,
-  "description": "Herramientas de entorno de Stellar",
+  "description": "Stellar environment tools",
   "scripts": {
     "setup:testnet": "./setup-testnet.sh"
   }

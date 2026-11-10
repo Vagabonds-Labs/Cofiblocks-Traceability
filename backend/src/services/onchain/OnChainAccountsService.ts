@@ -7,31 +7,32 @@ const contractFactory = new ContractFactory();
 
 const FRIENDBOT_URL = 'https://friendbot.stellar.org';
 
-/** `true` si la cuenta ya existe en la red. */
+/** `true` if the account already exists on the network. */
 export async function existsOnNetwork(address: string): Promise<boolean> {
   return (await contractFactory.getClient().loadAccountOrNull(address)) !== null;
 }
 
 /**
- * Altas en curso, por dirección. Evita pedir dos veces la misma cuenta cuando
- * el usuario entra dos veces seguidas. Es por proceso: no reemplaza el estado
- * persistido del faucet (`fundedAt`/`fundTx`), que llega con `POST /wallet/fund`.
+ * Account creations in progress, by address. Avoids requesting the same
+ * account twice when the user signs in twice in a row. It is per process: it
+ * does not replace the faucet's persisted state (`fundedAt`/`fundTx`), which
+ * comes with `POST /wallet/fund`.
  */
 const inFlight = new Map<string, Promise<string | null>>();
 
 /**
- * Crea la cuenta del usuario si todavía no existe.
+ * Creates the user's account if it does not exist yet.
  *
- * Hace falta porque las transacciones que firma el usuario lo usan como source
- * account. Sólo funciona en **testnet**, y la crea Friendbot: el backend no
- * gasta saldo propio. Antes la fondeaba la cuenta admin con 1 XLM, y como
- * cualquiera puede generar claves y entrar, cualquiera podía vaciarla; en
- * mainnet habría gastado fondos reales.
+ * It is needed because the transactions the user signs use them as the source
+ * account. It only works on **testnet**, and Friendbot creates the account: the
+ * backend does not spend its own balance. Previously the admin account funded
+ * it with 1 XLM, and since anyone can generate keys and sign in, anyone could
+ * drain it; on mainnet it would have spent real funds.
  *
- * En otra red no crea nada: para eso hace falta un faucet con presupuesto y
- * límites, que todavía no existe.
+ * On any other network it creates nothing: that needs a faucet with a budget
+ * and limits, which does not exist yet.
  *
- * Devuelve el hash de la transacción, o `null` si la cuenta ya existía.
+ * Returns the transaction hash, or `null` if the account already existed.
  */
 export async function ensureAccount(address: string): Promise<string | null> {
   if (!isClassicAddress(address)) {
@@ -61,8 +62,8 @@ async function createWithFriendbot(address: string): Promise<string | null> {
   const body = (await response.json().catch(() => ({}))) as { hash?: string; detail?: string };
 
   if (!response.ok) {
-    // Friendbot responde 400 si la cuenta ya existe (por ejemplo, la creó otra
-    // instancia del backend entre la consulta y el pedido).
+    // Friendbot responds 400 if the account already exists (for example,
+    // another backend instance created it between the check and the request).
     if (await existsOnNetwork(address)) return null;
     throw new Error(`Friendbot could not create ${address}: ${response.status} ${body.detail ?? ''}`.trim());
   }

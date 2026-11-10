@@ -1,16 +1,16 @@
 /**
- * Carga las organizaciones del piloto: la unión, las 3 cooperativas de Jimma
- * Zone / Gomma Woreda y sus centros de acopio.
+ * Loads the pilot organizations: the union, the 3 cooperatives in Jimma Zone /
+ * Gomma Woreda and their collection centers.
  *
  *   npm run db:seed
  *
- * Idempotente: se puede correr de nuevo sin duplicar nada. Los `chainId` son
- * los ids numéricos que usa el contrato y **no se pueden cambiar** una vez que
- * hay lotes on-chain.
+ * Idempotent: it can run again without duplicating anything. The `chainId`s
+ * are the numeric IDs the contract uses and **cannot change** once there are
+ * batches on chain.
  *
- * Los nombres de los centros salen del PDF del piloto ("CofiBlocks
- * Traceability App Flow – Ethiopia Pilot", sección 6) y la separación entre
- * nombres compuestos está pendiente de confirmar con Etiopía.
+ * The center names come from the pilot PDF ("CofiBlocks Traceability App Flow
+ * – Ethiopia Pilot", section 6); how compound names are split is still to be
+ * confirmed with Ethiopia.
  */
 import 'dotenv/config';
 import { OrganizationKind, PrismaClient } from '@prisma/client';

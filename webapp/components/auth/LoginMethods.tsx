@@ -10,15 +10,15 @@ import { isMobile } from '../../utils/platform'
 import { isCavosEnabled } from '@/lib/auth/cavos'
 
 /**
- * Formas de entrar.
+ * Ways to sign in.
  *
- * La app es para gente que no viene de web3, así que lo principal es entrar con
- * Telegram o email (Cavos). Conectar una wallet de Stellar sigue disponible,
- * como un link discreto al final: el modal lo abre el Stellar Wallets Kit
- * (Freighter, xBull, Albedo, Lobstr y Rabet).
+ * The app is for people who do not come from web3, so the main option is
+ * signing in with Telegram or email (Cavos). Connecting a Stellar wallet is
+ * still available, as a discreet link at the bottom: the Stellar Wallets Kit
+ * opens the modal (Freighter, xBull, Albedo, Lobstr and Rabet).
  *
- * Sin `NEXT_PUBLIC_CAVOS_APP_ID` la wallet es la única opción y vuelve a ser el
- * botón principal.
+ * Without `NEXT_PUBLIC_CAVOS_APP_ID` the wallet is the only option and becomes
+ * the main button again.
  */
 export function LoginMethods({
   walletError,

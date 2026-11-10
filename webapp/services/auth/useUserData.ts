@@ -6,9 +6,9 @@ import { authService } from './authService'
 import type { User } from './types'
 
 export function useUserData() {
-  // Arranca vacío y se completa al montar: leer `localStorage` durante el
-  // render hacía que el servidor (sin usuario) y el cliente (con usuario)
-  // renderizaran distinto, y React descartaba el árbol entero.
+  // Starts empty and is filled on mount: reading `localStorage` during render
+  // made the server (no user) and the client (with user) render differently,
+  // and React threw away the whole tree.
   const [user, setUser] = useState<User | null>(null)
 
   useEffect(() => {
@@ -53,8 +53,8 @@ export function useUserData() {
     }
   }, [])
 
-  // Sin sesión no hay nada que cargar: además de vaciar el usuario hay que
-  // terminar la carga, si no la página queda esperando para siempre.
+  // Without a session there is nothing to load: besides clearing the user, the
+  // loading state has to end, or the page waits forever.
   const clearUser = useCallback(() => {
     setUser(null)
     setLoading(false)

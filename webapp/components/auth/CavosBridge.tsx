@@ -6,10 +6,10 @@ import { useCavos } from '@cavos/kit/react'
 import { cavosSigner } from '@/services/wallet/cavosSigner'
 
 /**
- * Expone la sesión de Cavos a `walletService`.
+ * Exposes the Cavos session to `walletService`.
  *
- * No renderiza nada: cada vez que Cavos conecta o cierra la wallet de Stellar,
- * registra o borra el firmante en `cavosSigner`.
+ * It renders nothing: every time Cavos connects or closes the Stellar wallet,
+ * it registers or clears the signer in `cavosSigner`.
  */
 export function CavosBridge() {
   const { wallet, address, logout } = useCavos()

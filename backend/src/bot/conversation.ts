@@ -2,7 +2,7 @@ import { Prisma } from '@prisma/client';
 
 import { prisma } from '@/lib/prisma';
 
-/** Pasos del flujo del bot. Se guardan como texto en `BotConversation.step`. */
+/** Steps of the bot flow. Stored as text in `BotConversation.step`. */
 export type BotStep = 'CHOOSE_LANGUAGE' | 'CHOOSE_COOP' | 'ENTER_ID' | 'LINKED';
 
 export interface ConversationData {

@@ -47,8 +47,8 @@ export const adminService = {
   },
 
   /**
-   * Importa la lista de caficultores. Si el CSV tiene errores el backend
-   * responde 422 con el detalle por línea: se devuelve igual, no se lanza.
+   * Imports the farmer list. If the CSV has errors the backend responds 422
+   * with per-line details: they are returned as a result, not thrown.
    */
   async importFarmers(csv: string, dryRun: boolean): Promise<FarmerImportResult> {
     try {

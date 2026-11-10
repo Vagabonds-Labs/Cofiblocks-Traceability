@@ -3,7 +3,7 @@ export function formatDisplayName(walletAddress?: string | null, userName?: stri
     return userName.length > 14 ? `${userName.substring(0, 14)}…` : userName
   }
   if (walletAddress) {
-    // Las direcciones StrKey son largas y sin prefijo: se muestra la punta.
+    // StrKey addresses are long and unprefixed: show the ends.
     return `${walletAddress.substring(0, 4)}…${walletAddress.slice(-4)}`
   }
   return ''

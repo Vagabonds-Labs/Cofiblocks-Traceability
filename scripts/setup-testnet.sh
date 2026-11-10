@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Entorno de testnet para CofiBlocks Traceability.
+# Testnet environment for CofiBlocks Traceability.
 #
 #   ./scripts/setup-testnet.sh
 #
-# Crea (o reutiliza) la identidad que despliega el contrato y paga los fees de
-# los usuarios (fee-bump), y la fondea con friendbot. Idempotente.
+# Creates (or reuses) the identity that deploys the contract and pays the
+# users' fees (fee-bump), and funds it with Friendbot. Idempotent.
 set -euo pipefail
 
 NETWORK="testnet"
@@ -13,7 +13,7 @@ PASSPHRASE="Test SDF Network ; September 2015"
 ADMIN="${STELLAR_ADMIN_IDENTITY:-cofi-admin}"
 
 command -v stellar >/dev/null || {
-  echo "falta el CLI 'stellar' — cargo install --locked stellar-cli"; exit 1;
+  echo "the 'stellar' CLI is missing — cargo install --locked stellar-cli"; exit 1;
 }
 echo "CLI: $(stellar --version | head -1)"
 
@@ -24,16 +24,16 @@ stellar network add "$NETWORK" \
 if ! stellar keys address "$ADMIN" >/dev/null 2>&1; then
   stellar keys generate "$ADMIN" --network "$NETWORK" --fund >/dev/null
 fi
-# Fondear de nuevo es idempotente: si ya tiene saldo, friendbot falla y seguimos.
+# Funding again is idempotent: if it already has a balance, Friendbot fails and we move on.
 stellar keys fund "$ADMIN" --network "$NETWORK" >/dev/null 2>&1 || true
 
 cat <<SUMMARY
 
-Admin de testnet
-  identidad    $ADMIN
-  dirección    $(stellar keys address "$ADMIN")
+Testnet admin
+  identity     $ADMIN
+  address      $(stellar keys address "$ADMIN")
 
-Siguientes pasos:
+Next steps:
   ./contracts/scripts/deploy.sh testnet
-  STELLAR_ADMIN_SECRET del backend = \$(stellar keys show $ADMIN)
+  backend STELLAR_ADMIN_SECRET = \$(stellar keys show $ADMIN)
 SUMMARY

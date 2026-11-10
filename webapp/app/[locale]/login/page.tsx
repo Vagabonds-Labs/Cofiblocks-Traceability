@@ -19,7 +19,7 @@ export default function LoginPage() {
   const onEmailLoggedIn = useCallback(() => setEmailLoggedIn(true), [])
   const cavos = isCavosEnabled()
 
-  // Una vez dentro, a la página de inicio, que muestra lo que corresponde al rol.
+  // Once signed in, go to the home page, which shows what fits the user's role.
   useEffect(() => {
     if (!((wallet.address && wallet.isRegistered) || emailLoggedIn)) return
     router.push(`/${locale}`)
@@ -34,7 +34,7 @@ export default function LoginPage() {
   return (
     <main className="app-page app-container flex min-h-[calc(100vh-160px)] items-center py-8 md:py-12">
       <div className="mx-auto grid w-full max-w-5xl overflow-hidden rounded-3xl border border-white/70 bg-white shadow-[0_20px_60px_rgba(22,40,30,0.12)] lg:grid-cols-2">
-        {/* Panel de marca: sólo en pantallas grandes. En el celular sobra. */}
+        {/* Brand panel: large screens only. On phones it is just clutter. */}
         <section className="relative hidden flex-col justify-between gap-8 overflow-hidden bg-[linear-gradient(150deg,rgb(40,107,86)_0%,rgb(25,82,64)_60%,rgb(18,58,46)_100%)] p-10 text-white lg:flex">
           <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-[rgb(227,153,60)]/30 blur-3xl" />
           <div className="pointer-events-none absolute -bottom-24 -left-16 h-72 w-72 rounded-full bg-white/10 blur-3xl" />

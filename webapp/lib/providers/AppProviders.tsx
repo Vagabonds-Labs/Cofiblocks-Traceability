@@ -8,12 +8,12 @@ import { CavosBridge } from '@/components/auth/CavosBridge'
 import { cavosConfig, cavosModalConfig, isCavosEnabled } from '@/lib/auth/cavos'
 
 /**
- * Proveedores de la app.
+ * App providers.
  *
- * Hay dos formas de entrar: con Telegram o email, a través de Cavos, que le
- * crea al usuario una wallet de Stellar sin frases semilla; o con una wallet de
- * Stellar propia (Stellar Wallets Kit, que no necesita provider). Sin
- * `NEXT_PUBLIC_CAVOS_APP_ID` queda sólo la segunda.
+ * There are two ways to sign in: with Telegram or email through Cavos, which
+ * creates a Stellar wallet for the user without seed phrases; or with the
+ * user's own Stellar wallet (Stellar Wallets Kit, which needs no provider).
+ * Without `NEXT_PUBLIC_CAVOS_APP_ID` only the second one remains.
  */
 export function AppProviders({ children }: { children: ReactNode }) {
   const content = <UserProvider>{children}</UserProvider>

@@ -39,7 +39,7 @@ export interface StageAdvancedEvent {
 	data_hash: string;
 }
 
-/** Evento crudo, para las rutas que devuelven todo sin interpretar. */
+/** Raw event, for routes that return everything uninterpreted. */
 export interface RawEvent {
 	contractId: string;
 	name: string;

@@ -48,7 +48,7 @@ impl<'a> Setup<'a> {
         BytesN::from_array(&self.env, &[byte; 32])
     }
 
-    /// Lote recibido en COOP_A por un collector de COOP_A.
+    /// Batch received at COOP_A by a COOP_A collector.
     fn received_batch(&self, id: &str) -> String {
         let collector = self.staff(Role::Collector, COOP_A);
         let id = self.s(id);
@@ -184,10 +184,10 @@ fn un_farmer_ref_no_puede_quedar_en_dos_wallets() {
     let result = s.client.try_register_farmer(&segunda, &s.s("ID123"), &COOP_A);
     assert_eq!(result, Err(Ok(Error::FarmerRefTaken)));
 
-    // Re-registrar la misma wallet con el mismo ID es inofensivo.
+    // Re-registering the same wallet with the same ID is harmless.
     s.client.register_farmer(&primera, &s.s("ID123"), &COOP_A);
 
-    // Al revocar, el ID queda libre para otra wallet.
+    // After revoking, the ID is free for another wallet.
     s.client.revoke_role(&primera);
     assert_eq!(s.client.get_farmer_by_ref(&s.s("ID123")), None);
     s.client.register_farmer(&segunda, &s.s("ID123"), &COOP_A);
@@ -232,7 +232,7 @@ fn el_collector_crea_el_lote_en_received() {
     s.client
         .create_batch(&collector, &id, &s.s("ID123"), &CENTER, &45_000, &s.hash(1));
 
-    // `events().all()` sólo trae los de la última invocación: se mira antes de leer.
+    // `events().all()` only returns the last invocation's events: check before reading.
     let event = BatchCreated {
         id: id.clone(),
         farmer_ref: s.s("ID123"),
@@ -354,11 +354,11 @@ fn fermentation_se_puede_saltear_y_nada_mas() {
 
     s.client
         .advance_stage(&industry, &id, &Stage::Washing, &s.hash(2));
-    // Washing → Drying salta Fermentation: sí.
+    // Washing → Drying skips Fermentation: allowed.
     s.client
         .advance_stage(&industry, &id, &Stage::Drying, &s.hash(3));
 
-    // No se vuelve atrás ni se repite la etapa.
+    // No going back and no repeating a stage.
     for stage in [Stage::Washing, Stage::Fermentation, Stage::Drying] {
         let result = s.client.try_advance_stage(&industry, &id, &stage, &s.hash(4));
         assert_eq!(result, Err(Ok(Error::InvalidTransition)));
@@ -381,7 +381,7 @@ fn cada_etapa_la_mueve_su_rol() {
         assert_eq!(result, Err(Ok(Error::Unauthorized)));
     }
 
-    // Un caficultor tampoco mueve lotes.
+    // A farmer cannot move batches either.
     let farmer = Address::generate(&s.env);
     s.client.register_farmer(&farmer, &s.s("ID123"), &COOP_A);
     let result = s

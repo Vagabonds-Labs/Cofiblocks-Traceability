@@ -1,11 +1,11 @@
 /**
- * Da rol de admin al usuario de una wallet.
+ * Grants admin rights to the user of a wallet.
  *
  *   npm run admin:grant -- G…
  *
- * Existe porque con una base nueva no hay forma de crear el primer admin desde
- * la app: `updateAdminStatus` exige ya ser admin. El usuario tiene que haber
- * entrado al menos una vez con su wallet, así la fila existe.
+ * It exists because with a new database there is no way to create the first
+ * admin from the app: `updateAdminStatus` requires being an admin already. The
+ * user must have signed in at least once with their wallet, so the row exists.
  */
 import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
@@ -14,7 +14,7 @@ import { StrKey } from '@stellar/stellar-sdk';
 async function main() {
   const walletAddress = process.argv[2];
   if (!walletAddress || !StrKey.isValidEd25519PublicKey(walletAddress)) {
-    console.error('Uso: npm run admin:grant -- <cuenta Stellar G…>');
+    console.error('Usage: npm run admin:grant -- <Stellar account G…>');
     process.exit(1);
   }
 
@@ -23,17 +23,17 @@ async function main() {
     const user = await prisma.user.findFirst({ where: { walletAddress } });
     if (!user) {
       console.error(
-        `No hay usuario con la wallet ${walletAddress}. ` +
-          'Tiene que entrar una vez con su wallet antes de darle admin.'
+        `There is no user with the wallet ${walletAddress}. ` +
+          'They have to sign in once with their wallet before being made admin.'
       );
       process.exit(1);
     }
     if (user.isAdmin) {
-      console.log(`${walletAddress} ya es admin (usuario ${user.id}).`);
+      console.log(`${walletAddress} is already an admin (user ${user.id}).`);
       return;
     }
     await prisma.user.update({ where: { id: user.id }, data: { isAdmin: true } });
-    console.log(`✓ ${walletAddress} ahora es admin (usuario ${user.id}).`);
+    console.log(`✓ ${walletAddress} is now an admin (user ${user.id}).`);
   } finally {
     await prisma.$disconnect();
   }

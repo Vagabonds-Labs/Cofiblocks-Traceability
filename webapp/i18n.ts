@@ -1,7 +1,7 @@
 import { getRequestConfig } from 'next-intl/server';
 import { cookies } from 'next/headers';
 
-// Afaan Oromoo (om) y amárico (am) son los idiomas del piloto en Etiopía.
+// Afaan Oromoo (om) and Amharic (am) are the languages of the Ethiopia pilot.
 export type Locale = 'en' | 'es' | 'om' | 'am';
 export const locales: Locale[] = ['en', 'es', 'om', 'am'];
 

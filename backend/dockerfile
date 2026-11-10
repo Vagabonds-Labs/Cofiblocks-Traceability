@@ -1,33 +1,33 @@
-# Imagen del backend.
+# Backend image.
 #
 #   docker build -t cofiblocks-backend .
 #
-# Al arrancar aplica las migraciones pendientes y levanta la API en el puerto
-# 4000. Las variables de entorno (base, secretos JWT, Stellar…) se pasan en
-# tiempo de ejecución: el backend no arranca sin secretos JWT válidos.
+# On startup it applies pending migrations and starts the API on port 4000.
+# Environment variables (database, JWT secrets, Stellar…) are passed at run
+# time: the backend does not start without valid JWT secrets.
 
 # ── Build ────────────────────────────────────────────────────────────────
 FROM node:20-alpine AS builder
 
-# Prisma necesita OpenSSL para elegir su motor en Alpine.
+# Prisma needs OpenSSL to pick its engine on Alpine.
 RUN apk add --no-cache openssl
 
 WORKDIR /app
 
-# El schema y la config de Prisma van antes de instalar: el `postinstall`
-# corre `prisma generate` y los necesita.
+# The Prisma schema and config go in before installing: `postinstall` runs
+# `prisma generate`, which needs them.
 COPY package*.json prisma.config.ts ./
 COPY prisma ./prisma/
 RUN npm ci
 
 COPY tsconfig.json ./
 COPY src ./src
-# Las traducciones de las notificaciones se importan desde src/utils.
+# Notification translations are imported from src/utils.
 COPY locales ./locales
 RUN npm run build
 
-# Quita las dependencias de desarrollo y conserva el cliente de Prisma ya
-# generado (node_modules/.prisma).
+# Drop dev dependencies and keep the already generated Prisma client
+# (node_modules/.prisma).
 RUN npm prune --omit=dev && npm cache clean --force
 
 # ── Runtime ──────────────────────────────────────────────────────────────
@@ -37,7 +37,7 @@ ENV NODE_ENV=production
 
 WORKDIR /app
 
-# dumb-init para manejar señales; OpenSSL para el motor de Prisma.
+# dumb-init for signal handling; OpenSSL for the Prisma engine.
 RUN apk add --no-cache dumb-init openssl
 
 RUN addgroup -g 1001 -S nodejs && \
@@ -47,7 +47,7 @@ COPY --from=builder --chown=nodejs:nodejs /app/package*.json /app/prisma.config.
 COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nodejs:nodejs /app/prisma ./prisma
 COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
-# El código compilado lee las traducciones desde /app/locales.
+# The compiled code reads the translations from /app/locales.
 COPY --from=builder --chown=nodejs:nodejs /app/locales ./locales
 
 USER nodejs

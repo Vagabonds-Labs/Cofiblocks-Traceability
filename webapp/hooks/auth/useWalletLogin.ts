@@ -6,12 +6,12 @@ import { authService } from '@/services/auth'
 import { walletService } from '@/services/wallet/walletService'
 
 /**
- * Login por firma de wallet.
+ * Wallet-signature login.
  *
- * El flujo cambió respecto de Starknet: ya no se firma un typed data SNIP-12 ni
- * se verifica contra el contrato de cuenta del usuario. Acá el backend emite un
- * nonce de un solo uso, la wallet firma el mensaje en formato SEP-53 y el
- * backend lo verifica en local con la clave pública ed25519.
+ * The flow changed from Starknet: there is no SNIP-12 typed data to sign and
+ * no check against the user's account contract. Here the backend issues a
+ * single-use nonce, the wallet signs the message in SEP-53 format and the
+ * backend verifies it locally with the ed25519 public key.
  */
 export function useWalletLogin() {
   const [address, setAddress] = useState<string | null>(null)
@@ -19,7 +19,7 @@ export function useWalletLogin() {
   const [isRegistered, setIsRegistered] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Reconexión silenciosa si el usuario ya había elegido una wallet.
+  // Silent reconnection if the user had already chosen a wallet.
   useEffect(() => {
     let cancelled = false
 
@@ -37,7 +37,7 @@ export function useWalletLogin() {
     }
   }, [])
 
-  /** Abre el modal y devuelve la dirección, sin pedir firma. */
+  /** Opens the modal and returns the address, without asking for a signature. */
   const connectWalletWithoutSignature = useCallback(async () => {
     const connected = await walletService.connect()
     setAddress(connected)
@@ -51,7 +51,7 @@ export function useWalletLogin() {
     try {
       const connected = await walletService.connect()
 
-      // El nonce lo emite el backend: una firma vieja no sirve dos veces.
+      // The backend issues the nonce: an old signature cannot be reused.
       const { nonce, message } = await authService.requestNonce(connected)
       const signature = await walletService.signMessage(message, connected)
 

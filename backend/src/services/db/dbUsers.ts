@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { Prisma, StaffRole } from '@prisma/client';
 
-/** Campos de `User` que circulan por la app. */
+/** `User` fields that flow through the app. */
 const USER_SELECT = {
   id: true,
   name: true,

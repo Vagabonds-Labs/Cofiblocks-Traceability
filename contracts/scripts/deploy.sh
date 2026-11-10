@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Despliega el contrato de trazabilidad de CofiBlocks en Stellar.
+# Deploys the CofiBlocks traceability contract to Stellar.
 #
 #   ./contracts/scripts/deploy.sh testnet
 #   ./contracts/scripts/deploy.sh mainnet
 #
-# Deja `contracts/deployments/<network>.json`, que el backend lee para saber la
-# dirección del contrato. El admin del contrato es la identidad que despliega:
-# su clave secreta es la que va en `STELLAR_ADMIN_SECRET` del backend.
+# Writes `contracts/deployments/<network>.json`, which the backend reads to get
+# the contract address. The contract admin is the deploying identity: its
+# secret key goes in the backend's `STELLAR_ADMIN_SECRET`.
 set -euo pipefail
 
 NETWORK="${1:-testnet}"
@@ -26,13 +26,13 @@ case "$NETWORK" in
     RPC_URL="${STELLAR_RPC_URL_MAINNET:-https://mainnet.sorobanrpc.com}"
     ;;
   *)
-    echo "red desconocida: $NETWORK (usar testnet o mainnet)"; exit 1;;
+    echo "unknown network: $NETWORK (use testnet or mainnet)"; exit 1;;
 esac
 
 NET_ARGS=(--network-passphrase "$PASSPHRASE" --rpc-url "$RPC_URL")
 ADMIN_ADDRESS="$(stellar keys address "$ADMIN")"
 
-echo "red        $NETWORK"
+echo "network    $NETWORK"
 echo "admin      $ADMIN ($ADMIN_ADDRESS)"
 echo ""
 

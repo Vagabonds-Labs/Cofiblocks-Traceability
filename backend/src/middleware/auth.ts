@@ -23,13 +23,14 @@ declare global {
 const jwtService = new JwtService();
 
 /**
- * Usuario del pedido, o `null` si el token no sirve.
+ * The request's user, or `null` if the token is not valid.
  *
- * La firma del token sólo prueba quién es y en qué sesión entró. Los permisos
- * (admin, rol, organización) se leen de la base en cada pedido, y la sesión
- * tiene que seguir activa: cerrar sesión, revocarla, borrar al usuario o
- * quitarle el admin corta el acceso al instante. Antes los permisos salían del
- * token y seguían valiendo hasta que vencía.
+ * The token's signature only proves who the user is and which session they
+ * signed in with. Permissions (admin, role, organization) are read from the
+ * database on every request, and the session has to still be active: logging
+ * out, revoking the session, deleting the user or removing their admin rights
+ * cuts access immediately. Previously permissions came from the token and
+ * stayed valid until it expired.
  */
 async function resolveUser(token: string): Promise<Request['user'] | null> {
   const payload = jwtService.verifyAccessToken(token);
@@ -123,8 +124,8 @@ export const requireAdmin = async (
 };
 
 /**
- * Exige que el usuario tenga uno de los roles del piloto.
- * Se usa después de `authenticate`. Los admins pasan siempre.
+ * Requires the user to have one of the pilot roles.
+ * Used after `authenticate`. Admins always pass.
  */
 export const requireRole =
   (...roles: string[]) =>

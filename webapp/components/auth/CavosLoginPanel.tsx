@@ -6,10 +6,10 @@ import { ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline'
 import { useCavosLogin } from '@/hooks/auth/useCavosLogin'
 
 /**
- * Login con Cavos: un solo botón que abre su modal, con Telegram y email.
+ * Cavos login: a single button that opens its modal, with Telegram and email.
  *
- * Lo que pasa después de autenticarse (firmar el nonce y registrar la sesión
- * en nuestro backend) lo hace `useCavosLogin`.
+ * What happens after authenticating (signing the nonce and registering the
+ * session in our backend) is handled by `useCavosLogin`.
  */
 export function CavosLoginPanel({ onLoggedIn }: { onLoggedIn: () => void }) {
   const t = useTranslations()

@@ -2,7 +2,7 @@ import { Address, nativeToScVal, xdr } from '@stellar/stellar-sdk';
 
 import { ROLES, ROLE_DISCRIMINANTS, STAGES, STAGE_DISCRIMINANTS } from '../types/contracts';
 
-/** Conversión a `ScVal`, el formato de argumentos de Soroban. */
+/** Conversion to `ScVal`, Soroban's argument format. */
 
 export function addressVal(address: string): xdr.ScVal {
 	return Address.fromString(address).toScVal();
@@ -20,7 +20,7 @@ export function stringVal(value: string): xdr.ScVal {
 	return nativeToScVal(value, { type: 'string' });
 }
 
-/** `BytesN<32>` a partir de un hash en hex (64 caracteres). */
+/** `BytesN<32>` from a hex hash (64 characters). */
 export function bytes32Val(hex: string): xdr.ScVal {
 	const clean = hex.startsWith('0x') ? hex.slice(2) : hex;
 	if (!/^[0-9a-fA-F]{64}$/.test(clean)) {
@@ -29,7 +29,7 @@ export function bytes32Val(hex: string): xdr.ScVal {
 	return xdr.ScVal.scvBytes(Buffer.from(clean, 'hex'));
 }
 
-/** Los enum de contrato sin payload se serializan como el entero de su variante. */
+/** Contract enums without a payload serialize as their variant's integer. */
 export function roleVal(role: ROLES): xdr.ScVal {
 	const discriminant = ROLE_DISCRIMINANTS[role];
 	if (discriminant === undefined) {

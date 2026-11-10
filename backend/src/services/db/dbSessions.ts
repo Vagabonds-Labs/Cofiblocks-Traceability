@@ -49,9 +49,9 @@ export class DbSessions {
     }
 
     /**
-     * Sesión activa y vigente de un usuario, con los permisos actuales del
-     * usuario. `null` si la sesión no existe, es de otro usuario, se cerró o
-     * venció.
+     * A user's active, unexpired session, with the user's current permissions.
+     * `null` if the session does not exist, belongs to another user, was
+     * closed or expired.
      */
     async findActiveSessionWithUser(sessionId: string, userId: string): Promise<ActiveSessionUser | null> {
         const session = await prisma.session.findFirst({
@@ -78,9 +78,9 @@ export class DbSessions {
     }
 
     /**
-     * Borra una sesión y su refresh token, sólo si es del usuario indicado.
-     * Devuelve `false` si no había una sesión así: el usuario no puede tocar
-     * sesiones ajenas.
+     * Deletes a session and its refresh token, only if it belongs to the given
+     * user. Returns `false` if there was no such session: a user cannot touch
+     * other users' sessions.
      */
     async deleteUserSession(sessionId: string, userId: string): Promise<boolean> {
         const [, deleted] = await prisma.$transaction([

@@ -4,9 +4,9 @@ import { TokenPair } from "./Auth";
 export interface RegisterUserData {
   walletAddress: string;
   walletProvider?: string;
-  /** Firma en base64: SEP-53 para wallets de Stellar, prefijo de Cavos para Cavos. */
+  /** Base64 signature: SEP-53 for Stellar wallets, the Cavos prefix for Cavos. */
   signature: string;
-  /** Sólo Cavos: la control key que firmó. Si falta, se asume la propia cuenta. */
+  /** Cavos only: the control key that signed. If missing, the account itself is assumed. */
   signer?: string;
   nonce: string;
 }

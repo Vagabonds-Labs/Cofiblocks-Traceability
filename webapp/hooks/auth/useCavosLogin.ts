@@ -6,9 +6,9 @@ import { useCavos } from '@cavos/kit/react'
 import { authService } from '@/services/auth'
 
 /**
- * Marca de "el usuario salió a loguearse". Telegram redirige fuera de la app y
- * la página se recarga al volver, así que el estado de React no alcanza para
- * saber que hay un login en curso.
+ * Flag for "the user left to sign in". Telegram redirects out of the app and
+ * the page reloads on return, so React state is not enough to know a login is
+ * in progress.
  */
 const PENDING_KEY = 'cofiblocks:cavos-login-pending'
 
@@ -25,7 +25,7 @@ function writePending(value: boolean): void {
     if (value) window.sessionStorage.setItem(PENDING_KEY, '1')
     else window.sessionStorage.removeItem(PENDING_KEY)
   } catch {
-    // Sin sessionStorage (modo privado estricto) sólo se pierde la vuelta de Telegram.
+    // Without sessionStorage (strict private mode) only the Telegram return is lost.
   }
 }
 
@@ -38,16 +38,16 @@ function bytesToBase64(bytes: Uint8Array): string {
 }
 
 /**
- * Login con Cavos (Telegram o email).
+ * Cavos login (Telegram or email).
  *
- * Cavos se ocupa de autenticar y de la wallet: muestra su modal, y al terminar
- * expone la cuenta Stellar (`G…`) del usuario. Este hook hace lo que sigue,
- * igual que con una wallet propia: pide el nonce al backend, lo firma con la
- * wallet de Cavos y llama a `register_wallet`.
+ * Cavos handles authentication and the wallet: it shows its modal, and when it
+ * finishes it exposes the user's Stellar account (`G…`). This hook does the
+ * rest, same as with an own wallet: it requests the nonce from the backend,
+ * signs it with the Cavos wallet and calls `register_wallet`.
  *
- * La firma de Cavos no es SEP-53 y la hace la "control key" del dispositivo,
- * que puede no ser la cuenta: por eso viaja también `signer` y el backend la
- * verifica distinto (`provider: 'cavos'`).
+ * The Cavos signature is not SEP-53 and is made by the device's "control key",
+ * which may not be the account: that is why `signer` is sent too and the
+ * backend verifies it differently (`provider: 'cavos'`).
  */
 export function useCavosLogin(onLoggedIn: () => void) {
   const {
@@ -71,7 +71,7 @@ export function useCavosLogin(onLoggedIn: () => void) {
   const registering = useRef(false)
   const authorizing = useRef(false)
 
-  // Vuelta del redirect de Telegram.
+  // Return from the Telegram redirect.
   useEffect(() => {
     if (readPending()) setPending(true)
   }, [])
@@ -97,8 +97,8 @@ export function useCavosLogin(onLoggedIn: () => void) {
     clearAuthError()
     writePending(true)
     setPending(true)
-    // Si Cavos ya tenía la sesión (por ejemplo, después de salir sólo de
-    // nuestra app), no hace falta el modal: el efecto de abajo firma directo.
+    // If Cavos already had the session (for example, after signing out of our
+    // app only), the modal is not needed: the effect below signs directly.
     if (!isAuthenticated) openModal()
   }, [isAuthenticated, openModal, clearAuthError])
 
@@ -126,9 +126,9 @@ export function useCavosLogin(onLoggedIn: () => void) {
   useEffect(() => {
     if (!pending || !isAuthenticated || !address || wallet?.chain !== 'stellar') return
 
-    // Un dispositivo que todavía no firma por esta cuenta se autoriza primero;
-    // Cavos muestra lo que haga falta. Cuando termina, el estado cambia y este
-    // efecto vuelve a correr.
+    // A device that does not sign for this account yet is authorized first;
+    // Cavos shows whatever is needed. When it finishes, the state changes and
+    // this effect runs again.
     if (walletStatus.needsDeviceApproval) {
       if (authorizing.current || authorizingDevice) return
       authorizing.current = true

@@ -20,7 +20,7 @@ export const refreshTokenSchema = z.object({
 /**
  * Logout schema
  */
-// El logout cierra la sesión del access token; no lee ningún refresh token.
+// Logout closes the access token's session; it does not read any refresh token.
 export const logoutSchema = z.object({
   body: z.object({}).passthrough(),
 });
@@ -57,23 +57,23 @@ export const revokeSessionSchema = z.object({
  */
 export const registerWalletSchema = z.object({
   body: z.object({
-    // Cuenta clásica de Stellar. Las cuentas contrato (`C…`) no se soportan en v1.
+    // Classic Stellar account. Contract accounts (`C…`) are not supported in v1.
     address: z
       .string()
       .regex(/^G[A-Z2-7]{55}$/, 'Invalid Stellar address (expected a classic G… account)'),
-    // Firma SEP-53 en base64, no el par (r, s) de Starknet.
+    // SEP-53 signature in base64, not Starknet's (r, s) pair.
     signature: z
       .string()
       .min(1, 'Signature is required'),
-    // Tiene que venir de POST /api/auth/nonce.
+    // Must come from POST /api/auth/nonce.
     nonce: z
       .string()
       .min(1, 'Nonce is required'),
-    // Con qué firmó el usuario: Cavos (Telegram o email) o una wallet de
-    // Stellar. Cambia cómo se verifica la firma (ver `registerUser`) y le dice
-    // al webapp con qué firmar después.
+    // What the user signed with: Cavos (Telegram or email) or a Stellar
+    // wallet. It changes how the signature is verified (see `registerUser`)
+    // and tells the web app what to sign with later.
     provider: z.enum(['cavos', 'stellar']).optional(),
-    // Sólo Cavos: la "control key" que firmó, si no es la propia cuenta.
+    // Cavos only: the "control key" that signed, if it is not the account itself.
     signer: z
       .string()
       .regex(/^G[A-Z2-7]{55}$/, 'Invalid Stellar address (expected a classic G… account)')

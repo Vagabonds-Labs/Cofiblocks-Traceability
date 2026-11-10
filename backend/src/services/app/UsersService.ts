@@ -26,13 +26,13 @@ export async function registerUser(
     throw new HttpException(400, 'Signature is required for wallet registration');
   }
 
-  // El nonce tiene que haberlo emitido el backend y no haberse usado antes.
+  // The nonce must have been issued by the backend and not used before.
   await NonceService.consumeNonce(data.nonce, data.walletAddress);
 
   const message = NonceService.buildLoginMessage(data.nonce);
   if (data.walletProvider === 'cavos') {
-    // Cavos firma con su propio prefijo y, en un dispositivo agregado después,
-    // con una clave distinta de la cuenta: hay que comprobar que la controla.
+    // Cavos signs with its own prefix and, on a device added later, with a key
+    // other than the account: we have to check that it controls the account.
     const client = new ContractFactory().getClient();
     await verifyCavosSignature(
       data.walletAddress,
@@ -42,7 +42,7 @@ export async function registerUser(
       (address) => client.loadAccountOrNull(address)
     );
   } else {
-    // Verificación ed25519 local, formato SEP-53. No hace falta tocar la red.
+    // Local ed25519 verification, SEP-53 format. No network call needed.
     verifyStellarSignature(data.walletAddress, message, data.signature);
   }
 
@@ -66,7 +66,7 @@ export async function updateUser(
   return dbUsers.updateUser(userId, data);
 }
 
-/** Lista de usuarios con filtros y paginación (admin). */
+/** User list with filters and pagination (admin). */
 export async function getAllUsers(filters: {
   role?: StaffRole;
   organizationId?: string;
@@ -111,12 +111,12 @@ export async function deleteUser(userId: string): Promise<void> {
 }
 
 /**
- * Asigna un rol del piloto a un usuario: primero en el contrato (firma el
- * backend como admin) y, si la transacción se confirma, en la base.
+ * Assigns a pilot role to a user: first in the contract (the backend signs as
+ * admin) and, if the transaction is confirmed, in the database.
  *
- * - El Export Manager pertenece a la unión; el resto, a una cooperativa.
- * - El Coffee Collector necesita además su centro de acopio, que tiene que
- *   ser de su misma cooperativa.
+ * - The Export Manager belongs to the union; everyone else, to a cooperative.
+ * - The Coffee Collector also needs their collection center, which must belong
+ *   to the same cooperative.
  */
 export async function assignRole(
   userId: string,
@@ -179,7 +179,7 @@ export async function assignRole(
   return { user: updated, tx_hash: txHash };
 }
 
-/** Quita el rol en el contrato y en la base. */
+/** Removes the role from the contract and the database. */
 export async function revokeRole(userId: string): Promise<{ user: UserResponse; tx_hash: string }> {
   const user = await dbUsers.findUserById(userId);
   if (!user) throw new HttpException(404, 'User not found', 'USER_NOT_FOUND');

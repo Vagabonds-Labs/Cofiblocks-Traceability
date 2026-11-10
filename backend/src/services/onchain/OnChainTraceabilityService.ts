@@ -9,16 +9,16 @@ import { logger } from '@/lib/logger';
 const contracts = new ContractFactory();
 const eventsClient = new EventsClient();
 
-/** `StaffRole` de Prisma → rol del contrato. Los nombres coinciden. */
+/** Prisma `StaffRole` → contract role. The names match. */
 function toChainRole(role: StaffRole): ROLES {
   return ROLES[role as keyof typeof ROLES];
 }
 
 /**
- * Asigna un rol on-chain. La firma el backend, que es el admin del contrato.
+ * Assigns a role on chain. The backend, which is the contract admin, signs it.
  *
- * Después de confirmar la transacción se verifica el evento `role_granted`:
- * así lo que guarda la base sale de lo que pasó en la cadena.
+ * After the transaction is confirmed, the `role_granted` event is checked: that
+ * way what the database stores comes from what happened on chain.
  */
 export async function grantRole(walletAddress: string, role: StaffRole, org: number): Promise<string> {
   const traceability = contracts.getTraceabilityService();
@@ -43,8 +43,8 @@ export async function revokeRole(walletAddress: string): Promise<string> {
 }
 
 /**
- * Vincula la wallet de un caficultor con su `farmer_ref`. La firma el backend
- * después de que el bot validó el ID contra la lista de la cooperativa.
+ * Links a farmer's wallet to their `farmer_ref`. The backend signs it after the
+ * bot has checked the ID against the cooperative's list.
  */
 export async function registerFarmer(walletAddress: string, farmerRef: string, coop: number): Promise<string> {
   const tx = await contracts.getTraceabilityService().registerFarmer(walletAddress, farmerRef, coop);

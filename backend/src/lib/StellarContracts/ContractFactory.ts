@@ -3,7 +3,7 @@ import { TxBuilder } from './TxBuilder';
 import { TxSubmitter } from './TxSubmitter';
 import { Traceability } from './contracts';
 
-/** Fábrica de servicios de cadena. */
+/** Factory for chain services. */
 export class ContractFactory {
   private readonly client: StellarClient;
 

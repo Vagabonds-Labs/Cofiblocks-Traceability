@@ -1,10 +1,10 @@
 /**
- * Direcciones de los contratos por red.
+ * Contract addresses per network.
  *
- * Se sincroniza a mano desde `contracts/deployments/<network>.json`, que emite
- * `contracts/scripts/deploy.sh`. `STELLAR_TRACEABILITY_ADDRESS` pisa la
- * dirección de cualquier red (útil para probar un despliegue nuevo sin tocar
- * el código).
+ * Kept in sync by hand with `contracts/deployments/<network>.json`, which
+ * `contracts/scripts/deploy.sh` writes. `STELLAR_TRACEABILITY_ADDRESS`
+ * overrides the address on any network (useful to try a new deployment
+ * without changing the code).
  */
 import { StellarContract } from './types/contracts';
 

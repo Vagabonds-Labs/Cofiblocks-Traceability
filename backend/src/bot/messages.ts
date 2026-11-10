@@ -1,8 +1,8 @@
 /**
- * Textos del bot en inglés, Afaan Oromoo y amárico.
+ * Bot texts in English, Afaan Oromoo and Amharic.
  *
- * Las traducciones a oromo y amárico son un primer borrador: el equipo local
- * tiene que revisarlas antes del piloto. Si falta una clave, cae en inglés.
+ * The Oromo and Amharic translations are a first draft: the local team has to
+ * review them before the pilot. If a key is missing, it falls back to English.
  */
 export const BOT_LANGUAGES = [
   { code: 'en', label: 'English' },
@@ -89,8 +89,8 @@ const am: Record<MessageKey, string> = {
 const MESSAGES: Partial<Record<BotLanguage, Partial<Record<MessageKey, string>>>> = { en, om, am };
 
 /**
- * Pregunta por el idioma en los tres idiomas: todavía no sabemos cuál lee el
- * caficultor.
+ * Asks for the language in all three languages: we do not know yet which one
+ * the farmer reads.
  */
 export function chooseLanguagePrompt(): string {
   return BOT_LANGUAGES.map((language) => t(language.code, 'chooseLanguage')).join('\n\n');

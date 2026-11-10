@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
 
-/** Cooperativas y unión, con sus centros de acopio y cuántos caficultores tienen. */
+/** Cooperatives and union, with their collection centers and farmer counts. */
 export async function listOrganizations() {
   return prisma.organization.findMany({
     orderBy: [{ kind: 'asc' }, { chainId: 'asc' }],

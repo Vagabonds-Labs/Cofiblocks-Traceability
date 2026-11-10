@@ -1,15 +1,15 @@
 /**
- * Parser de CSV mínimo (RFC 4180): comas, comillas dobles, comillas escapadas
- * (`""`) y saltos de línea dentro de campos entre comillas. Acepta `\n` y `\r\n`.
+ * Minimal CSV parser (RFC 4180): commas, double quotes, escaped quotes (`""`)
+ * and line breaks inside quoted fields. Accepts `\n` and `\r\n`.
  *
- * Devuelve las filas como arrays de texto, sin recortar espacios.
+ * Returns the rows as arrays of strings, without trimming whitespace.
  */
 export function parseCsv(text: string): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
   let field = '';
   let inQuotes = false;
-  // Un BOM al inicio (Excel lo pone) no es parte del primer encabezado.
+  // A leading BOM (Excel adds one) is not part of the first header.
   const input = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
 
   for (let i = 0; i < input.length; i++) {
@@ -46,6 +46,6 @@ export function parseCsv(text: string): string[][] {
     row.push(field);
     rows.push(row);
   }
-  // Las líneas en blanco no son filas.
+  // Blank lines are not rows.
   return rows.filter((r) => r.some((value) => value.trim() !== ''));
 }

@@ -4,11 +4,11 @@ import { useEffect } from 'react'
 import { walletService } from '@/services/wallet/walletService'
 
 /**
- * Vigila que la wallet conectada siga siendo la de la sesión.
+ * Watches that the connected wallet is still the session's wallet.
  *
- * Sólo aplica a las wallets de extensión, donde el usuario puede cambiar de
- * cuenta sin avisarnos. La wallet de Cavos está atada a la sesión de Telegram
- * o email y no cambia sola.
+ * It only applies to extension wallets, where the user can switch accounts
+ * without telling us. The Cavos wallet is tied to the Telegram or email
+ * session and does not change on its own.
  */
 export function useWalletWatcher(user: any, logoutCallback: () => void) {
   useEffect(() => {

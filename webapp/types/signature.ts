@@ -1,8 +1,8 @@
 /**
- * Formato SEP-53 para firmar mensajes.
+ * SEP-53 format for signing messages.
  *
- * La wallet antepone este prefijo y hashea con SHA-256 antes de firmar, así un
- * mensaje firmado nunca puede pasar por una transacción firmada. El backend
- * verifica lo mismo en local con la clave pública ed25519 de la cuenta.
+ * The wallet prepends this prefix and hashes with SHA-256 before signing, so a
+ * signed message can never pass for a signed transaction. The backend checks
+ * the same thing locally with the account's ed25519 public key.
  */
 export const SEP53_PREFIX = 'Stellar Signed Message:\n'

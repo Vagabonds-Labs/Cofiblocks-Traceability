@@ -24,9 +24,10 @@ const router = Router();
 /**
  * POST /api/auth/nonce
  *
- * Emite el nonce que hay que firmar para entrar. Vence en 5 minutos y se
- * consume una sola vez: el backend rechaza cualquier firma cuyo nonce no haya
- * salido de acá. Antes lo generaba el cliente y nunca se invalidaba.
+ * Issues the nonce that has to be signed to sign in. It expires in 5 minutes
+ * and can be used only once: the backend rejects any signature whose nonce did
+ * not come from here. Previously the client generated it and it was never
+ * invalidated.
  */
 router.post('/nonce', validate(nonceSchema), async (req: Request, res: Response, next) => {
   const { address } = req.body;
@@ -51,9 +52,10 @@ router.post('/refresh', validate(refreshTokenSchema), async (req: Request, res: 
   
   
   router.post('/logout', authenticate, validate(logoutSchema), async (req: Request, res: Response, next) => {
-    // Se cierra la sesión del access token, que ya validó `authenticate`. Antes
-    // se usaba el refresh token que mandara el cliente: sin él, la sesión
-    // quedaba abierta; con el de otra sesión, cerraba esa y no la propia.
+    // Close the session of the access token, already validated by
+    // `authenticate`. Previously it used whatever refresh token the client
+    // sent: without one, the session stayed open; with another session's,
+    // it closed that one instead of its own.
     await AuthService.revokeSession(req.user!.sessionId, req.user!.userId);
 
     clearRefreshTokenCookie(res);
@@ -88,10 +90,10 @@ router.delete(
     const { sessionId } = req.params;
     const userId = req.user!.userId;
 
-    // Borra sólo si la sesión es del usuario (id y dueño en la misma consulta).
+    // Delete only if the session belongs to the user (ID and owner in the same query).
     await AuthService.revokeSession(sessionId, userId);
 
-    // Si revocó la sesión desde la que está pidiendo, también se le cierran las cookies.
+    // If they revoked the session they are calling from, clear their cookies too.
     if (sessionId === req.user!.sessionId) {
       clearRefreshTokenCookie(res);
       clearAccessTokenCookie(res);
@@ -136,14 +138,14 @@ router.delete(
       await NotificationsService.pushInfoNotification(user.id, "welcome_message");
     }
 
-    // Las transacciones que firma el usuario lo usan como source account, así
-    // que la cuenta tiene que existir en la red. En testnet la crea Friendbot
-    // (sin gastar saldo del backend), en segundo plano para no demorar el
-    // login; si falla, se reintenta en el próximo.
+    // The transactions the user signs use them as the source account, so the
+    // account has to exist on the network. On testnet Friendbot creates it
+    // (without spending the backend's balance), in the background so login is
+    // not delayed; if it fails, it is retried on the next login.
     //
-    // Las cuentas de Cavos NO: las crea Cavos con sus propios datos y firmantes.
-    // Si la creáramos antes, Cavos la vería "desplegada" sin sus datos y dejaría
-    // al usuario esperando aprobar el dispositivo.
+    // NOT for Cavos accounts: Cavos creates them with its own data and signers.
+    // If we created one first, Cavos would see it as "deployed" without its
+    // data and leave the user waiting to approve their device.
     if (provider !== 'cavos') {
       OnChainAccountsService.ensureAccount(address).catch((error) => {
         req.log.error({ error, address }, 'Could not create the user account on chain');

@@ -6,12 +6,12 @@ import { isClassicAddress, isContractAddress } from '@/lib/StellarContracts/util
 import { logger } from '@/lib/logger';
 
 /**
- * Prefijo de SEP-53. Es lo que las wallets anteponen antes de hashear, para que
- * un mensaje firmado nunca pueda pasar por una transacción firmada.
+ * SEP-53 prefix. Wallets prepend it before hashing, so that a signed message
+ * can never pass for a signed transaction.
  */
 const SEP53_PREFIX = 'Stellar Signed Message:\n';
 
-/** `SHA256("Stellar Signed Message:\n" + mensaje)`, que es lo que se firma. */
+/** `SHA256("Stellar Signed Message:\n" + message)`, which is what gets signed. */
 export function hashSignedMessage(message: string): Buffer {
   return createHash('sha256')
     .update(Buffer.concat([Buffer.from(SEP53_PREFIX, 'utf8'), Buffer.from(message, 'utf8')]))
@@ -19,14 +19,14 @@ export function hashSignedMessage(message: string): Buffer {
 }
 
 /**
- * Verifica una firma de wallet en local, sin tocar la red.
+ * Verifies a wallet signature locally, without touching the network.
  *
- * En Starknet había que llamar a `is_valid_signature` del contrato de cuenta del
- * usuario, con reintentos porque el RPC fallaba. Las cuentas clásicas de Stellar
- * son claves ed25519: se verifican con la clave pública y nada más.
+ * On Starknet we had to call `is_valid_signature` on the user's account
+ * contract, with retries because the RPC was flaky. Classic Stellar accounts
+ * are ed25519 keys: they are verified with the public key and nothing else.
  *
- * Las cuentas contrato (`C…`, smart wallets y passkeys) no se verifican así.
- * v1 las rechaza con un error explícito en vez de fallar de forma confusa.
+ * Contract accounts (`C…`, smart wallets and passkeys) are not verified this
+ * way. v1 rejects them with an explicit error instead of failing confusingly.
  */
 export function verifyStellarSignature(
   address: string,
@@ -62,14 +62,14 @@ export function verifyStellarSignature(
 }
 
 /**
- * Prefijo con el que firma mensajes Cavos (`@cavos/kit`, `prefixedMessageBytes`).
+ * Prefix Cavos uses when signing messages (`@cavos/kit`, `prefixedMessageBytes`).
  *
- * No es SEP-53: Cavos firma los bytes `"Cavos Signed Message:\n" + largo + "\n"
- * + mensaje` directamente con ed25519, sin hashear antes.
+ * It is not SEP-53: Cavos signs the bytes `"Cavos Signed Message:\n" + length +
+ * "\n" + message` directly with ed25519, without hashing first.
  */
 const CAVOS_PREFIX = 'Cavos Signed Message:\n';
 
-/** Los bytes que firma Cavos para `message`. */
+/** The bytes Cavos signs for `message`. */
 export function cavosSignedMessageBytes(message: string): Buffer {
   const body = Buffer.from(message, 'utf8');
   return Buffer.concat([
@@ -81,20 +81,21 @@ export function cavosSignedMessageBytes(message: string): Buffer {
 }
 
 /**
- * Verifica el login de una wallet de Cavos.
+ * Verifies a Cavos wallet login.
  *
- * En Cavos la cuenta Stellar (`address`) es una multisig y quien firma es la
- * "control key" del dispositivo (`signer`). En el primer dispositivo la control
- * key es la misma dirección que la cuenta; en un dispositivo aprobado después
- * es otra clave, agregada como firmante de la cuenta.
+ * In Cavos the Stellar account (`address`) is a multisig, and the signer is the
+ * device's "control key" (`signer`). On the first device the control key is the
+ * same address as the account; on a device approved later it is a different
+ * key, added as a signer of the account.
  *
- * Por eso, además de la firma, se verifica que `signer` controle `address`:
- * - si son la misma dirección, alcanza con la firma;
- * - si no, la cuenta tiene que existir en la red y tener a `signer` como
- *   firmante con peso suficiente. Una cuenta que todavía no existe no se puede
- *   comprobar, y se rechaza en vez de confiar en lo que diga el cliente.
+ * So besides the signature, we check that `signer` controls `address`:
+ * - if they are the same address, the signature is enough;
+ * - otherwise the account must exist on the network and have `signer` as a
+ *   signer with enough weight. An account that does not exist yet cannot be
+ *   checked, so it is rejected instead of trusting what the client says.
  *
- * `loadAccount` devuelve la cuenta tal como la ve Horizon, o `null` si no existe.
+ * `loadAccount` returns the account as Horizon sees it, or `null` if it does
+ * not exist.
  */
 export async function verifyCavosSignature(
   address: string,

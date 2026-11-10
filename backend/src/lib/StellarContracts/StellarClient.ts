@@ -3,8 +3,8 @@ import { Horizon, Keypair, NotFoundError, rpc } from '@stellar/stellar-sdk';
 import { getDeployment, NetworkDeployment } from './deployments';
 
 /**
- * Punto único de acceso a la red: RPC de Soroban, Horizon y la cuenta con la
- * que el backend firma (asignación de roles, fee-bumps y creación de cuentas).
+ * Single access point to the network: Soroban RPC, Horizon and the account the
+ * backend signs with (role assignment and fee-bumps).
  */
 export class StellarClient {
 	public readonly network: string;
@@ -16,9 +16,9 @@ export class StellarClient {
 	private static readSource: string | null = null;
 
 	constructor(network?: string) {
-		// `||` y no `??`: una variable definida pero vacía en el .env tiene que caer
-		// en el default, no quedar como string vacío. El default es testnet: un
-		// .env incompleto nunca tiene que terminar operando con fondos reales.
+		// `||`, not `??`: a variable that is defined but empty in .env must fall
+		// back to the default, not stay an empty string. The default is testnet:
+		// an incomplete .env must never end up operating with real funds.
 		this.network = network || process.env.STELLAR_NETWORK || 'testnet';
 		this.deployment = getDeployment(this.network);
 		this.networkPassphrase = this.deployment.networkPassphrase;
@@ -26,7 +26,7 @@ export class StellarClient {
 	}
 
 	/**
-	 * Cuenta del backend. Paga los fees vía fee-bump y es el admin del contrato.
+	 * The backend's account. Pays fees via fee-bump and is the contract admin.
 	 */
 	public getServiceKeypair(): Keypair {
 		const secret = process.env.STELLAR_ADMIN_SECRET;
@@ -41,11 +41,11 @@ export class StellarClient {
 	}
 
 	/**
-	 * Source account para simular lecturas.
+	 * Source account for simulating reads.
 	 *
-	 * La simulación no valida la secuencia ni exige que la cuenta exista, así que
-	 * cualquier clave pública sirve. Usar una efímera evita que leer un balance o
-	 * un producto dependa de tener `STELLAR_ADMIN_SECRET` configurada.
+	 * Simulation does not check the sequence or require the account to exist,
+	 * so any public key works. Using an ephemeral one keeps reads from depending
+	 * on `STELLAR_ADMIN_SECRET` being configured.
 	 */
 	public getReadSourceAddress(): string {
 		if (!StellarClient.readSource) {
@@ -55,11 +55,12 @@ export class StellarClient {
 	}
 
 	/**
-	 * La cuenta tal como la ve Horizon, o `null` si no existe en la red.
+	 * The account as Horizon sees it, or `null` if it does not exist on the
+	 * network.
 	 *
-	 * Sólo un 404 significa "no existe". Cualquier otro error — Horizon caído,
-	 * una URL mal configurada — se propaga en vez de disfrazarse de cuenta
-	 * inexistente.
+	 * Only a 404 means "does not exist". Any other error — Horizon down, a
+	 * misconfigured URL — is propagated instead of passing for a missing
+	 * account.
 	 */
 	public async loadAccountOrNull(address: string): Promise<Horizon.AccountResponse | null> {
 		try {
@@ -70,7 +71,7 @@ export class StellarClient {
 		}
 	}
 
-	/** Horizon hace falta para balances clásicos y trustlines; el RPC no los expone. */
+	/** Horizon is needed for classic balances and trustlines; the RPC does not expose them. */
 	public getHorizon(): Horizon.Server {
 		if (!StellarClient.horizonServer) {
 			const url =

@@ -8,28 +8,28 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-// ── personal y autenticación ──────────────────────────────────────────────
+// ── staff and authentication ──────────────────────────────────────────────
 
-/// Persona que entra a la app web: personal de las cooperativas y de la unión,
-/// y los admins de CofiBlocks. Los caficultores no son `User`: usan el bot y
-/// viven en `Farmer`.
+/// Person who signs in to the web app: cooperative and union staff, and the
+/// CofiBlocks admins. Farmers are not `User`s: they use the bot and live in
+/// `Farmer`.
 model User {
   id                    String            @id @default(uuid())
   name                  String?
   email                 String?
-  /// Usuario de Telegram, si entró con Telegram (vía Cavos).
+  /// Telegram username, if they signed in with Telegram (through Cavos).
   telegramUsername      String?           @map("telegram_username")
   createdAt             DateTime          @default(now()) @map("created_at")
   updatedAt             DateTime          @updatedAt @map("updated_at")
   isAdmin               Boolean           @default(false) @map("is_admin")
   walletAddress         String?           @unique @map("wallet_address")
   walletProvider        String?           @map("wallet_provider")
-  /// Rol en el piloto. `null` hasta que un admin se lo asigna.
+  /// Role in the pilot. `null` until an admin assigns one.
   role                  StaffRole?
   organizationId        String?           @map("organization_id")
-  /// Sólo para los Coffee Collectors: su centro de acopio.
+  /// Coffee Collectors only: their collection center.
   collectionCenterId    String?           @map("collection_center_id")
-  /// Transacción que dejó el rol en el contrato.
+  /// Transaction that wrote the role to the contract.
   roleTx                String?           @map("role_tx")
   organization          Organization?     @relation(fields: [organizationId], references: [id])
   collectionCenter      CollectionCenter? @relation(fields: [collectionCenterId], references: [id])
@@ -41,8 +41,8 @@ model User {
   @@map("users")
 }
 
-/// Nonce de login por firma de wallet. Lo emite `POST /auth/nonce`, vence
-/// rápido y se consume una sola vez.
+/// Nonce for wallet-signature login. Issued by `POST /auth/nonce`, expires
+/// quickly and can be used only once.
 model AuthNonce {
   id            String    @id @default(uuid())
   nonce         String    @unique
@@ -100,16 +100,16 @@ model Notification {
   @@map("notifications")
 }
 
-// ── organizaciones ────────────────────────────────────────────────────────
+// ── organizations ─────────────────────────────────────────────────────────
 
-/// Cooperativa o unión.
+/// Cooperative or union.
 model Organization {
   id                String             @id @default(uuid())
   kind              OrganizationKind
   name              String
-  /// Código corto, p. ej. `KK`. Prefija el `farmer_ref` on-chain.
+  /// Short code, e.g. `KK`. Prefixes the on-chain `farmer_ref`.
   code              String             @unique
-  /// Id numérico que usa el contrato (`org`/`coop`).
+  /// Numeric ID used by the contract (`org`/`coop`).
   chainId           Int                @unique @map("chain_id")
   region            String?
   zone              String?
@@ -125,7 +125,7 @@ model Organization {
 model CollectionCenter {
   id             String       @id @default(uuid())
   name           String
-  /// Id numérico que usa el contrato (`collection_center`).
+  /// Numeric ID used by the contract (`collection_center`).
   chainId        Int          @unique @map("chain_id")
   organizationId String       @map("organization_id")
   createdAt      DateTime     @default(now()) @map("created_at")
@@ -137,27 +137,27 @@ model CollectionCenter {
   @@map("collection_centers")
 }
 
-// ── caficultores ──────────────────────────────────────────────────────────
+// ── farmers ───────────────────────────────────────────────────────────────
 
-/// Caficultor del piloto. Lo precarga la cooperativa (lista de IDs) y lo
-/// completa el propio caficultor desde el bot de Telegram.
+/// Pilot farmer. Pre-loaded by the cooperative (list of IDs) and completed by
+/// the farmer through the Telegram bot.
 model Farmer {
   id                 String            @id @default(uuid())
   organizationId     String            @map("organization_id")
-  /// ID que le asignó la cooperativa. Único dentro de la cooperativa.
+  /// ID assigned by the cooperative. Unique within the cooperative.
   coopFarmerId       String            @map("coop_farmer_id")
   collectionCenterId String?           @map("collection_center_id")
   fullName           String?           @map("full_name")
   phone              String?
-  /// Id numérico del usuario de Telegram. Se fija cuando el caficultor se
-  /// identifica en el bot con su ID de cooperativa.
+  /// Numeric Telegram user ID. Set when the farmer identifies themselves in
+  /// the bot with their cooperative ID.
   telegramUserId     BigInt?           @unique @map("telegram_user_id")
   telegramUsername   String?           @map("telegram_username")
   language           String?
   status             FarmerStatus      @default(PRELOADED)
-  /// Wallet Cavos, creada en la Mini App.
+  /// Cavos wallet, created in the Mini App.
   walletAddress      String?           @unique @map("wallet_address")
-  /// Transacción de `register_farmer`.
+  /// `register_farmer` transaction.
   registerTx         String?           @map("register_tx")
   consentHash        String?           @map("consent_hash")
   consentTx          String?           @map("consent_tx")
@@ -173,9 +173,9 @@ model Farmer {
   @@map("farmers")
 }
 
-/// Estado de la conversación del bot con un chat de Telegram. Vive en la base
-/// para que el registro se pueda retomar donde quedó, aunque el backend se
-/// reinicie.
+/// State of the bot's conversation with a Telegram chat. Stored in the
+/// database so registration can resume where it left off, even if the
+/// backend restarts.
 model BotConversation {
   chatId    BigInt   @id @map("chat_id")
   farmerId  String?  @unique @map("farmer_id")
@@ -191,8 +191,8 @@ model BotConversation {
 
 // ── enums ─────────────────────────────────────────────────────────────────
 
-/// Roles del personal. El orden y los nombres siguen el enum `Role` del
-/// contrato (sin `Farmer`, que no es personal).
+/// Staff roles. The order and names follow the contract's `Role` enum
+/// (without `Farmer`, which is not staff).
 enum StaffRole {
   COLLECTOR
   COMMITTEE_MEMBER
@@ -207,13 +207,13 @@ enum OrganizationKind {
 }
 
 enum FarmerStatus {
-  /// Cargado desde la lista de la cooperativa; todavía no habló con el bot.
+  /// Loaded from the cooperative's list; has not talked to the bot yet.
   PRELOADED
-  /// Se identificó en el bot con su ID; el registro está en curso.
+  /// Identified in the bot with their ID; registration is in progress.
   LINKED
-  /// Completó el registro en el bot.
+  /// Completed registration in the bot.
   REGISTERED
-  /// Firmó el consentimiento EUDR en la Mini App.
+  /// Signed the EUDR consent in the Mini App.
   CONSENTED
 }
 

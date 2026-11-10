@@ -1,4 +1,4 @@
-/** Roles del personal del piloto. Coinciden con `StaffRole` del backend. */
+/** Pilot staff roles. They match the backend's `StaffRole`. */
 export const STAFF_ROLES = [
   'COLLECTOR',
   'COMMITTEE_MEMBER',

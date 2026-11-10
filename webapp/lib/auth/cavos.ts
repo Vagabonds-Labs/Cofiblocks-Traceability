@@ -1,6 +1,6 @@
 import type { CavosConfig, CavosModalConfig } from '@cavos/kit/react'
 
-/** App ID del dashboard de Cavos. Sin él, la app ofrece sólo el login con wallet. */
+/** App ID from the Cavos dashboard. Without it, the app offers wallet login only. */
 export const CAVOS_APP_ID = process.env.NEXT_PUBLIC_CAVOS_APP_ID
 
 export function isCavosEnabled(): boolean {
@@ -8,11 +8,11 @@ export function isCavosEnabled(): boolean {
 }
 
 /**
- * Configuración de Cavos.
+ * Cavos configuration.
  *
- * `appSalt` nombra el lugar donde cada dispositivo guarda su clave. **No se
- * puede cambiar** una vez que haya usuarios: si cambia, cada dispositivo genera
- * una clave nueva y todos quedan esperando aprobar el dispositivo.
+ * `appSalt` names the place where each device stores its key. **It cannot
+ * change** once there are users: if it does, every device generates a new key
+ * and everyone is left waiting to approve their device.
  */
 export const cavosConfig: CavosConfig = {
   appId: CAVOS_APP_ID,
@@ -23,7 +23,7 @@ export const cavosConfig: CavosConfig = {
   appSalt: 'cofiblocks-traceability',
 }
 
-/** Modal de login de Cavos: Telegram primero, porque es lo que usan en el piloto. */
+/** Cavos login modal: Telegram first, because that is what the pilot uses. */
 export const cavosModalConfig: CavosModalConfig = {
   appName: 'CofiBlocks Traceability',
   appLogo: '/images/logo.png',

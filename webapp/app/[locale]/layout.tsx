@@ -14,11 +14,11 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 /**
- * El layout ya no busca configuración en el backend antes de renderizar.
+ * The layout no longer fetches configuration from the backend before rendering.
  *
- * Antes tenía que traer la config de Cavos con hasta 5 reintentos y esperas de
- * 3 a 7 segundos, bloqueando el render. La conexión de wallet no necesita nada
- * de eso: el Stellar Wallets Kit se inicializa en el cliente cuando hace falta.
+ * It used to fetch the Cavos config with up to 5 retries and 3 to 7 second
+ * waits, blocking the render. Connecting a wallet needs none of that: the
+ * Stellar Wallets Kit is initialized on the client when needed.
  */
 export default async function RootLayout({
   children,

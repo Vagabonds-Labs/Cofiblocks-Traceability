@@ -6,29 +6,29 @@ import { StellarClient } from './StellarClient';
 import { toDomainError } from './errors';
 import { SubmittedTransaction } from './types/transactions';
 
-/** Fee que pone el backend al envolver la transacción del usuario, en stroops. */
+/** Fee the backend sets when wrapping the user's transaction, in stroops. */
 const FEE_BUMP_BASE_FEE = '100000';
 
 const POLL_INTERVAL_MS = 1_000;
 const POLL_TIMEOUT_MS = 45_000;
 
 /**
- * Recibe la transacción firmada por el usuario, la envuelve en un fee-bump y la
- * manda a la red.
+ * Takes the transaction signed by the user, wraps it in a fee-bump and sends it
+ * to the network.
  *
- * El backend paga el fee con su propia cuenta, así ningún usuario necesita
- * tener XLM. También es de acá de donde
- * sale el hash — más confiable que confiar en el que reporte el cliente.
+ * The backend pays the fee with its own account, so no user needs XLM. This is
+ * also where the hash comes from — more reliable than trusting the one the
+ * client reports.
  */
 export class TxSubmitter {
   constructor(private readonly client: StellarClient) {}
 
   /**
-   * Envía una transacción firmada por el usuario, pagando el fee el backend.
+   * Submits a transaction signed by the user, with the backend paying the fee.
    *
-   * `feeBump: false` sirve para las transacciones donde el backend ya es la
-   * source account y por lo tanto ya paga el fee — por ejemplo una trustline
-   * patrocinada.
+   * `feeBump: false` is for transactions where the backend is already the
+   * source account and therefore already pays the fee — for example a
+   * sponsored trustline.
    */
   public async submitSigned(
     signedXdr: string,
@@ -67,12 +67,12 @@ export class TxSubmitter {
   }
 
   /**
-   * Detecta una firma hecha para otra red.
+   * Detects a signature made for another network.
    *
-   * La firma de Stellar cubre el hash de la transacción, y ese hash incluye la
-   * passphrase de la red. Algunas wallets — LOBSTR — ignoran la red que se les
-   * pide y firman siempre para mainnet. En testnet eso llegaba como un
-   * `tx_bad_auth` que no explica nada; acá se reconoce y se dice qué pasó.
+   * A Stellar signature covers the transaction hash, and that hash includes the
+   * network passphrase. Some wallets — LOBSTR — ignore the requested network
+   * and always sign for mainnet. On testnet that showed up as an unhelpful
+   * `tx_bad_auth`; here it is recognized and explained.
    */
   private assertSignedForThisNetwork(tx: Transaction): void {
     const hash = tx.hash();
@@ -86,7 +86,7 @@ export class TxSubmitter {
       const keypair = Keypair.fromPublicKey(address);
       const hint = keypair.signatureHint();
       for (const signature of tx.signatures) {
-        // En el SDK 17 `hint` y `signature` son envoltorios con los bytes en `.value`.
+        // In SDK 17 `hint` and `signature` are wrappers with the bytes in `.value`.
         if (!Buffer.from(signature.hint.value).equals(hint)) continue;
         if (!keypair.verify(hash, Buffer.from(signature.signature.value))) {
           throw new HttpException(
@@ -100,7 +100,7 @@ export class TxSubmitter {
     }
   }
 
-  /** Envía una transacción que ya firmó el backend (roles, caficultores). */
+  /** Submits a transaction already signed by the backend (roles, farmers). */
   public async submitAsService(tx: Transaction): Promise<SubmittedTransaction> {
     return this.send(tx.toXDR());
   }
