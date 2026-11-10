@@ -109,7 +109,7 @@ router.delete(
   });
   
   router.post('/register_wallet', validate(registerWalletSchema), async (req: Request, res: Response, next) => {
-    const { address, signature, nonce, provider }: RegisterWalletRequest = req.body;
+    const { address, signature, nonce, provider, signer }: RegisterWalletRequest = req.body;
   
     // Get session data from request
     const sessionData = {
@@ -123,6 +123,7 @@ router.delete(
         walletAddress: address,
         walletProvider: provider ?? 'stellar',
         signature: signature,
+        signer,
         nonce,
       }
     );
@@ -136,9 +137,15 @@ router.delete(
     // Las transacciones que firma el usuario lo usan como source account, así
     // que la cuenta tiene que existir en la red. Se crea en segundo plano para
     // no demorar el login; si falla, se reintenta en el próximo.
-    OnChainAccountsService.ensureAccount(address).catch((error) => {
-      req.log.error({ error, address }, 'Could not create the user account on chain');
-    });
+    //
+    // Las cuentas de Cavos NO: las crea Cavos con sus propios datos y firmantes.
+    // Si la creáramos antes, Cavos la vería "desplegada" sin sus datos y dejaría
+    // al usuario esperando aprobar el dispositivo.
+    if (provider !== 'cavos') {
+      OnChainAccountsService.ensureAccount(address).catch((error) => {
+        req.log.error({ error, address }, 'Could not create the user account on chain');
+      });
+    }
     
     setRefreshTokenCookie(res, tokens.refreshToken);
     setAccessTokenCookie(res, tokens.accessToken);

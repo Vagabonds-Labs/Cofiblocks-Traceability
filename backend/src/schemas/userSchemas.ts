@@ -70,10 +70,15 @@ export const registerWalletSchema = z.object({
     nonce: z
       .string()
       .min(1, 'Nonce is required'),
-    // Con qué firmó el usuario: Cavos (Telegram o email), Privy o una wallet de
-    // Stellar. Sólo le dice al webapp con qué firmar después; la verificación
-    // de la firma es la misma en todos los casos.
-    provider: z.enum(['cavos', 'privy', 'stellar']).optional(),
+    // Con qué firmó el usuario: Cavos (Telegram o email) o una wallet de
+    // Stellar. Cambia cómo se verifica la firma (ver `registerUser`) y le dice
+    // al webapp con qué firmar después.
+    provider: z.enum(['cavos', 'stellar']).optional(),
+    // Sólo Cavos: la "control key" que firmó, si no es la propia cuenta.
+    signer: z
+      .string()
+      .regex(/^G[A-Z2-7]{55}$/, 'Invalid Stellar address (expected a classic G… account)')
+      .optional(),
   }),
 });
 

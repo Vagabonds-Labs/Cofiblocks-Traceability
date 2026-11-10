@@ -22,7 +22,7 @@ npm run admin:grant -- G…
 
 | Método y ruta | Quién | Qué hace |
 |---|---|---|
-| `POST /api/auth/nonce`, `POST /api/auth/register_wallet` | todos | Login por firma de wallet (SEP-53). Crea la cuenta Stellar del usuario si no existe. |
+| `POST /api/auth/nonce`, `POST /api/auth/register_wallet` | todos | Login por firma: SEP-53 para wallets de Stellar, prefijo de Cavos con `provider: 'cavos'` (y `signer`, la control key). A quien no usa Cavos le crea la cuenta Stellar si no existe. |
 | `GET /api/auth/me` | sesión | Usuario actual con su rol, organización y centro. |
 | `GET /api/organizations` | sesión | Cooperativas y unión con sus centros de acopio. |
 | `GET /api/users` | admin | Usuarios, filtrables por rol y organización. |

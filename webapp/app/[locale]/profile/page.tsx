@@ -1,17 +1,13 @@
 'use client'
 
-import { CheckCircleIcon, ChevronDownIcon, ShieldCheckIcon, UserIcon } from '@heroicons/react/24/outline'
+import { CheckCircleIcon, ShieldCheckIcon, UserIcon } from '@heroicons/react/24/outline'
 import { useLocale, useTranslations } from 'next-intl'
 import Link from 'next/link'
 
 import { useUser } from '@/lib/providers/UserProvider'
 import { useProfileForm } from '@/hooks'
 import { ProfileForm } from '@/components/profile'
-import { ExportWalletKey } from '@/components/profile/ExportWalletKey'
-import { LoginMethodsLinks } from '@/components/profile/LoginMethodsLinks'
 import { ExplorerLink } from '@/components/trace'
-import { PASSKEY_LOGIN_ENABLED, SOCIAL_LOGIN_ENABLED } from '@/lib/auth/loginMethods'
-import { isPrivyEnabled } from '@/services/wallet/privySigner'
 import { shortAddress } from '@/utils/stellar'
 
 export default function ProfilePage() {
@@ -19,7 +15,7 @@ export default function ProfilePage() {
   const locale = useLocale()
   const { user, loading, error: userError, refreshUser } = useUser()
   const form = useProfileForm(user, t, refreshUser)
-  const isPrivy = user?.walletProvider === 'privy'
+  const isCavos = user?.walletProvider === 'cavos'
   const error = userError || form.error
   const initials = user?.name
     ?.trim()
@@ -116,20 +112,8 @@ export default function ProfilePage() {
             </div>
           )}
           <p className="text-sm leading-relaxed text-[#5a6760]">
-            {t(isPrivy ? 'profile.dashboard.access_simple' : 'profile.dashboard.access_wallet')}
+            {t(isCavos ? 'profile.dashboard.access_simple' : 'profile.dashboard.access_wallet')}
           </p>
-          {isPrivyEnabled() && isPrivy && (SOCIAL_LOGIN_ENABLED || PASSKEY_LOGIN_ENABLED) && (
-            <LoginMethodsLinks t={t} />
-          )}
-          {isPrivyEnabled() && isPrivy && user.walletAddress && (
-            <details className="group mt-5 border-t border-[#e5ebe6] pt-4">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg py-1 text-sm font-medium text-[#5a6760] [&::-webkit-details-marker]:hidden">
-                {t('profile.dashboard.advanced_options')}
-                <ChevronDownIcon className="h-4 w-4 transition group-open:rotate-180" aria-hidden="true" />
-              </summary>
-              <ExportWalletKey walletAddress={user.walletAddress} t={t} />
-            </details>
-          )}
         </section>
       </div>
     </main>

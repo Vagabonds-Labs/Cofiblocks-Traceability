@@ -1,11 +1,20 @@
 'use client'
 
 import { ApiError } from '@/lib/api'
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { authService } from './authService'
+import type { User } from './types'
 
 export function useUserData() {
-  const [user, setUser] = useState(authService.getCurrentUser())
+  // Arranca vacío y se completa al montar: leer `localStorage` durante el
+  // render hacía que el servidor (sin usuario) y el cliente (con usuario)
+  // renderizaran distinto, y React descartaba el árbol entero.
+  const [user, setUser] = useState<User | null>(null)
+
+  useEffect(() => {
+    const stored = authService.getCurrentUser()
+    if (stored) setUser(stored)
+  }, [])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 

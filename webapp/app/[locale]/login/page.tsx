@@ -7,7 +7,7 @@ import { CheckBadgeIcon, LockClosedIcon, ShieldCheckIcon } from '@heroicons/reac
 
 import { LoginMethods } from '@/components/auth/LoginMethods'
 import { useWalletLogin } from '@/hooks'
-import { isPrivyEnabled } from '@/services/wallet/privySigner'
+import { isCavosEnabled } from '@/lib/auth/cavos'
 
 export default function LoginPage() {
   const t = useTranslations()
@@ -17,7 +17,7 @@ export default function LoginPage() {
   const wallet = useWalletLogin()
   const [emailLoggedIn, setEmailLoggedIn] = useState(false)
   const onEmailLoggedIn = useCallback(() => setEmailLoggedIn(true), [])
-  const privy = isPrivyEnabled()
+  const cavos = isCavosEnabled()
 
   // Una vez dentro, a la página de inicio, que muestra lo que corresponde al rol.
   useEffect(() => {
@@ -64,10 +64,10 @@ export default function LoginPage() {
         {/* Formulario */}
         <section className="p-6 sm:p-10">
           <h1 className="text-3xl font-bold text-[rgb(var(--cb-text))]">
-            {privy ? t('auth.login_title') : t('auth.title_sign_in')}
+            {cavos ? t('auth.login_title') : t('auth.title_sign_in')}
           </h1>
           <p className="mb-8 mt-2 text-[rgb(var(--cb-muted))]">
-            {privy ? t('auth.login_subtitle') : t('auth.subtitle_login_wallet_only')}
+            {cavos ? t('auth.login_subtitle') : t('auth.subtitle_login_wallet_only')}
           </p>
 
           <LoginMethods

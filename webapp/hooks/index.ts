@@ -1,5 +1,5 @@
 export * from './auth/useWalletLogin'
-export * from './auth/usePrivyLogin'
+export * from './auth/useCavosLogin'
 export * from './ui/useOutsideClick'
 export * from './menu/useUserMenuLogic'
 export * from './profile/useProfileForm'

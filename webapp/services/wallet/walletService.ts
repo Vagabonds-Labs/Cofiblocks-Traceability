@@ -8,7 +8,7 @@ import { LobstrModule } from "@creit.tech/stellar-wallets-kit/modules/lobstr";
 import { RabetModule } from "@creit.tech/stellar-wallets-kit/modules/rabet";
 
 import { authService } from "@/services/auth/authService";
-import { privySigner } from "@/services/wallet/privySigner";
+import { cavosSigner } from "@/services/wallet/cavosSigner";
 import { PreparedTransaction } from "@/types/contracts";
 
 const SELECTED_WALLET_KEY = "cofiblocks:selected-wallet";
@@ -22,24 +22,23 @@ function networkFromEnv(): Networks {
 /**
  * Acceso a la wallet del usuario.
  *
- * Reemplaza al `executeTransactions(calls[])` de Starknet, que mandaba un
- * multicall. Acá el backend arma y simula la transacción entera, la wallet sólo
- * la firma, y el backend la envía con fee-bump. Por eso el servicio devuelve el
- * XDR firmado en vez de un hash: el hash lo saca el backend del submit, que es
- * más confiable que confiar en el que reporte el cliente.
+ * El backend arma y simula la transacción entera, la wallet sólo la firma, y el
+ * backend la envía con fee-bump. Por eso el servicio devuelve el XDR firmado en
+ * vez de un hash: el hash lo saca el backend del submit, que es más confiable
+ * que confiar en el que reporte el cliente.
  *
  * Wallets soportadas: Freighter, xBull, Albedo, Lobstr y Rabet. WalletConnect
  * requiere `@reown/appkit` y un projectId de Reown; se agrega como un módulo más
  * en `init()` cuando esas dos cosas estén.
  *
- * Los usuarios que entraron con email o Google (`walletProvider: 'privy'`)
- * firman con su wallet embebida de Privy en vez del kit.
+ * Los usuarios que entraron con Telegram o email (`walletProvider: 'cavos'`)
+ * firman con su wallet de Cavos en vez del kit.
  */
 class WalletService {
   private initialized = false;
 
-  private isPrivyUser(): boolean {
-    return authService.getCurrentUser()?.walletProvider === "privy";
+  private isCavosUser(): boolean {
+    return authService.getCurrentUser()?.walletProvider === "cavos";
   }
 
   /** Idempotente: el kit se inicializa una sola vez, y sólo en el browser. */
@@ -101,9 +100,9 @@ class WalletService {
   }
 
   async disconnect(): Promise<void> {
-    // Cerrar también la sesión de Privy: si no, el próximo "continuar con
-    // email" entraría directo con la cuenta anterior.
-    await privySigner.logout().catch((err) => console.error("Privy logout error:", err));
+    // Cerrar también la sesión de Cavos: si no, el próximo "continuar con
+    // Telegram o email" entraría directo con la cuenta anterior.
+    await cavosSigner.logout().catch((err) => console.error("Cavos logout error:", err));
     this.init();
     try {
       await StellarWalletsKit.disconnect();
@@ -145,10 +144,10 @@ class WalletService {
       throw new Error("The transaction expired before being signed. Try again.");
     }
 
-    if (this.isPrivyUser()) {
+    if (this.isCavosUser()) {
       const user = authService.getCurrentUser();
       if (!user?.walletAddress) throw new Error("No wallet address found");
-      return privySigner.signTransaction(prepared.xdr, prepared.network_passphrase, user.walletAddress);
+      return cavosSigner.signTransaction(prepared.xdr, user.walletAddress);
     }
 
     this.init();
@@ -161,15 +160,10 @@ class WalletService {
     return signedTxXdr;
   }
 
-  /**
-   * Firma una transacción sin exigir que haya sesión.
-   *
-   * Lo necesita el alta de trustline patrocinada: pasa antes de que el usuario
-   * tenga nada más que una wallet conectada.
-   */
+  /** Firma una transacción sin exigir que haya sesión en nuestro backend. */
   async signTransactionAs(prepared: PreparedTransaction, address: string): Promise<string> {
-    if (this.isPrivyUser() || privySigner.hasAddress(address)) {
-      return privySigner.signTransaction(prepared.xdr, prepared.network_passphrase, address);
+    if (this.isCavosUser() || cavosSigner.hasAddress(address)) {
+      return cavosSigner.signTransaction(prepared.xdr, address);
     }
     this.init();
     const { signedTxXdr } = await StellarWalletsKit.signTransaction(prepared.xdr, {
