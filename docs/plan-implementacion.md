@@ -8,23 +8,23 @@
 **Decisiones tomadas:**
 
 - **Dos canales:**
-  - **Caficultores:** usan solo un **bot de Telegram**. El bot los registra con el ID que les dio la cooperativa.
+  - **Caficultores:** usan solo un **bot de Telegram con voz, que construye y opera VoiceLedger** (decidido el 10 de noviembre). VoiceLedger convierte lo que dice o escribe el caficultor en **JSON estructurado y nos lo envía a nuestra API**. Nosotros no hacemos el bot.
   - **Personal de la coop y de la unión:** usa una **app web**. Entra con **email vía Cavos**, como pide el SOW. También puede entrar con Telegram vía Cavos, o con una wallet de Stellar propia.
-- **Los caficultores no tienen wallet.** En Telegram no se puede embeber una wallet, así que **todas sus transacciones las firma una wallet del backend**, la "wallet de caficultores" (`farmer agent`).
+- **Los caficultores no tienen wallet.** En Telegram no se puede embeber una wallet, así que **todas sus transacciones las firma una wallet de nuestro backend**, la "wallet de caficultores" (`farmer agent`), al recibir cada mensaje de VoiceLedger.
   - On-chain, el caficultor se identifica solo por su `farmer_ref` seudónimo (por ejemplo `KK-ID001`).
   - La wallet de caficultores es distinta de la wallet admin y solo puede hacer acciones de caficultor.
   - Se descarta la Telegram Mini App con Cavos.
 - **El personal firma sus propias transacciones** con su wallet invisible de Cavos. Esa wallet se **fondea automáticamente con XLM de testnet** desde un faucet. Los fees los paga el backend con fee-bump, así que el usuario nunca necesita XLM.
 - **Flujo del lote del SOW:**
-  1. El caficultor **registra su entrega** desde el bot. Ese registro es inmutable.
+  1. El caficultor **registra su entrega** desde el bot de VoiceLedger. Ese registro es inmutable.
   2. El Coffee Collector **agrega el peso y el recibo**. También son inmutables.
   3. Desde ahí, los cambios solo **avanzan la etapa** o **adjuntan documentos**.
 - **El perfil de la finca y las prácticas sí se pueden editar**, y los edita el propio caficultor desde el bot, como pide el SOW. Esto reemplaza la decisión anterior de que solo el personal editaba.
-- **GPS:** el botón nativo de Telegram "Compartir ubicación", o coordenadas escritas.
-- La cooperativa entrega la **lista de IDs de los caficultores**.
-- **La voz (VoiceLedger) queda fuera del sprint.** El bot funciona con texto y botones.
+- **GPS:** lo captura el bot de VoiceLedger ("Compartir ubicación", coordenadas escritas o dictadas) y nos llega en el JSON con su origen.
+- La cooperativa entrega la **lista de IDs de los caficultores**. Nosotros la validamos cuando VoiceLedger nos pide vincular a alguien.
+- **Qué nos toca a nosotros del lado del caficultor:** la API que recibe los JSON de VoiceLedger, su validación, la escritura on-chain y los avisos de vuelta (ver [§2.4](#24-integración-con-voiceledger-caficultores)).
 
-> **Hay que avisarle a Alejandra Vargas (Ambassador Chapter Lead) de un cambio frente al SOW.** El SOW dice que todos los actores, también los caficultores, entran con email y reciben una wallet invisible. En la práctica, los caficultores usan Telegram y el backend firma por ellos. La evidencia "A Farmer creates a batch" va a ser una transacción firmada por la wallet de caficultores, con el `farmer_ref` en el evento. Conviene contárselo antes de entregar la evidencia.
+> **Hay que avisarle a Alejandra Vargas (Ambassador Chapter Lead) de un cambio frente al SOW.** El SOW dice que todos los actores, también los caficultores, entran con email y reciben una wallet invisible. En la práctica, los caficultores usan el bot de Telegram de VoiceLedger y nuestro backend firma por ellos. La evidencia "A Farmer creates a batch" va a ser una transacción firmada por la wallet de caficultores, con el `farmer_ref` en el evento. Conviene contárselo antes de entregar la evidencia.
 
 Cada semana termina con una **demo visual**, con transacciones reales en Stellar Testnet. La demo además cumple lo que el SOW promete para esa semana.
 
@@ -40,8 +40,9 @@ Cada semana termina con una **demo visual**, con transacciones reales en Stellar
 - [x] Base nueva (migración inicial) y seed de la unión, las 3 cooperativas y sus 11 centros.
 - [x] Admin: asignar y quitar roles (on-chain), e importar la lista de caficultores por CSV.
 - [x] Inicio según el rol.
-- [x] Bot v0: idioma, cooperativa e ID. Probado con updates simulados; falta el token del bot real.
-- [x] Login con Cavos (Telegram y email) en lugar de Privy, con el login por wallet de Stellar todavía disponible. Falta probarlo con el App ID real.
+- [x] Bot v0: idioma, cooperativa e ID. Probado con updates simulados. **Ya no se usa:** el bot lo hace VoiceLedger. El código queda en `backend/src/bot`; la validación del ID contra la lista se reusa en la API de integración.
+- [x] Traducciones de la webapp a afaan oromo y amárico (borrador, falta revisión de una persona nativa).
+- [x] Login con Cavos (Telegram y email) en lugar de Privy, con el login por wallet de Stellar todavía disponible. Probado con la app real de Cavos (usando su UUID interno como App ID; pendiente reportarles el bug del nonce de Telegram).
 - [ ] Staging.
 
 **Decisiones de la semana 0:**
@@ -72,8 +73,8 @@ Cada semana termina con una **demo visual**, con transacciones reales en Stellar
 
 | Semana | El SOW dice | Nuestro plan |
 |---|---|---|
-| 1 (16–20 nov) | Cavos con email, wallet invisible y faucet de testnet | Igual, más la wallet de caficultores y el registro on-chain del caficultor desde el bot. |
-| 2 (23–27 nov) | Contratos con permisos por rol y cambios inmutables, probados localmente | Igual, y **adelantamos el deploy a testnet**. El bot ya registra perfil, prácticas y entregas. |
+| 1 (16–20 nov) | Cavos con email, wallet invisible y faucet de testnet | Igual, más la wallet de caficultores, el endpoint de integración con VoiceLedger y el registro on-chain del caficultor. |
+| 2 (23–27 nov) | Contratos con permisos por rol y cambios inmutables, probados localmente | Igual, y **adelantamos el deploy a testnet**. La API ya recibe perfil, prácticas y entregas de VoiceLedger. |
 | 3 (30 nov – 4 dic) | Deploy a testnet y frontend: escribir datos, subir documentos, exportar CSV | Igual. |
 | 4 (7–11 dic) | Pruebas de punta a punta, tests de permisos automáticos, demo y documentación | Igual. |
 
@@ -84,8 +85,9 @@ Cada semana termina con una **demo visual**, con transacciones reales en Stellar
 ### 2.1 Arquitectura
 
 ```
-Caficultor ── Telegram ──► Bot (backend) ──► wallet de caficultores ──┐
-                                                                     ▼
+Caficultor ── Telegram/voz ──► Bot de VoiceLedger ── JSON firmado ──► API de integración ──► wallet de caficultores ──┐
+                                        ▲                                                                            │
+                                        └──────────── avisos de peso y etapa (webhook) ◄── Backend                   ▼
 Personal coop/unión ── Webapp (Cavos) ── firma ──► Backend API ──► Contrato traceability (Stellar)
                                                        │
                                                        └──► Postgres + Supabase Storage
@@ -124,7 +126,7 @@ Cambios frente al v0 desplegado:
 | Función | Quién | Qué hace |
 |---|---|---|
 | `grant_role`, `revoke_role`, `set_farmer_agent`, `set_admin`, `upgrade` | Admin | Administración |
-| `register_farmer(farmer_ref, coop)` | Wallet de caficultores | Da de alta al caficultor cuando se vincula por el bot. |
+| `register_farmer(farmer_ref, coop)` | Wallet de caficultores | Da de alta al caficultor cuando VoiceLedger nos avisa que se vinculó. |
 | `record_consent(farmer_ref, consent_hash)` | Wallet de caficultores | Deja constancia del consentimiento EUDR. |
 | `set_profile(farmer_ref, profile_hash)` | Wallet de caficultores | Perfil de la finca y prácticas. **Editable:** cada versión emite un evento con su hash. |
 | `create_batch(batch_id, farmer_ref, center, data_hash)` | Wallet de caficultores | **Registro de la entrega. Inmutable.** El lote queda en la etapa `Delivered`. |
@@ -190,26 +192,36 @@ Las cuentas con wallet propia se fondean directo con Friendbot.
 
 La cuenta tiene que existir antes de firmar, y el faucet lo garantiza. Si `signXdr` da problemas, la alternativa es `wallet.invokeContract` con el relayer de Cavos.
 
-### 2.4 Bot de Telegram (caficultores)
+### 2.4 Integración con VoiceLedger (caficultores)
 
-- **Dónde vive:** en el backend, con grammY.
-- **Estado de la conversación:** se guarda en Postgres, para retomar donde quedó.
-- **Las transacciones** las firma la wallet de caficultores. El bot muestra el enlace a la transacción después de cada acción.
+**Reparto:**
 
-**Flujos del sprint:**
+- **VoiceLedger:** el bot de Telegram, la voz (reconocimiento en los idiomas locales), los textos y las traducciones del bot, y la conversación con el caficultor.
+- **Nosotros:** la API que recibe sus mensajes, la validación, la base de datos, la escritura on-chain con la wallet de caficultores y los avisos de vuelta.
 
-1. **Vincularse:** `/start` → idioma → cooperativa → **ID de la cooperativa**, validado contra la lista. El backend llama `register_farmer`. *Ya existe sin la parte on-chain.*
-2. **Consentimiento EUDR:** el bot muestra el texto y las 3 declaraciones, y el caficultor acepta con botones. El backend llama `record_consent`.
-3. **Perfil de la finca y prácticas (editable):**
-   - datos básicos;
-   - parcelas: tamaño en fachasa (el sistema lo convierte a hectáreas) y ubicación con "Compartir ubicación" o coordenadas escritas;
-   - prácticas de la temporada.
+**Cómo se conectan (propuesta para acordar con ellos):**
 
-   Al final hay un resumen con **Confirmar** o **Corregir**, y el backend llama `set_profile`. Después se puede volver a editar.
-4. **Registrar una entrega:** el caficultor elige el centro de acopio. Opcionalmente escribe los kg estimados y la madurez. El bot genera el número `DD-MM-YYYY [FarmerID]` y el backend llama `create_batch`.
-5. **Avisos:** cuando el Collector registra el peso, y en cada cambio de etapa de sus lotes.
+- Ruta `POST /integrations/voiceledger/events`, un evento por mensaje.
+- **Autenticación:** firma HMAC-SHA256 del cuerpo con un secreto compartido, más un timestamp. Se rechazan firmas inválidas y mensajes de más de 5 minutos.
+- **Sin duplicados:** cada evento trae un `event_id`. Si llega dos veces, devolvemos la misma respuesta sin volver a escribir on-chain.
+- **Respuesta:** el resultado y el enlace a la transacción en Stellar Expert, para que el bot se lo muestre al caficultor. Si la confirmación tarda, respondemos `202` y el resultado se consulta con `GET /integrations/voiceledger/events/:event_id`.
+- **Errores** con códigos estables (`FARMER_NOT_FOUND`, `FARMER_REF_TAKEN`, `INVALID_PAYLOAD`…), para que el bot sepa qué decirle al caficultor.
+- Guardamos cada mensaje recibido. Si VoiceLedger manda la transcripción o la referencia al audio, también, como respaldo off-chain.
 
-**Fuera del sprint:** voz (VoiceLedger), fotos de tenencia y de árboles, el cuestionario completo del paso 1.5 del PDF, y consultar "mis lotes" (salvo que sobre tiempo).
+**Eventos del sprint:**
+
+| Evento | Qué nos mandan | Qué hacemos |
+|---|---|---|
+| `farmer.linked` | Código de la cooperativa, ID del caficultor, usuario de Telegram, idioma | Validamos el ID contra la lista y llamamos `register_farmer`. Respondemos con el `farmer_ref`. |
+| `farmer.consent` | Versión del texto, las 3 declaraciones aceptadas, fecha, idioma | Guardamos y llamamos `record_consent` con el hash. El texto y sus versiones los definimos nosotros y se los pasamos. |
+| `farmer.profile` | Datos básicos, parcelas (fachasa y GPS con su origen), prácticas | Convertimos fachasa a hectáreas, validamos que el GPS caiga en Gomma, guardamos una versión nueva y llamamos `set_profile`. Una edición es otro evento igual. |
+| `delivery.created` | `farmer_ref`, centro de acopio, y opcionalmente kg estimados y madurez | Generamos el número `DD-MM-YYYY [FarmerID]`, llamamos `create_batch` y respondemos con el número. |
+
+**De vuelta hacia VoiceLedger:** cuando el Collector registra el peso o el lote cambia de etapa, les enviamos un webhook firmado para que el bot le avise al caficultor. Si prefieren consultar, exponemos los lotes de un caficultor. Se define con ellos.
+
+**Para no depender de su calendario:** un **simulador** (script que envía los mismos JSON firmados) y la documentación OpenAPI con ejemplos. Con el simulador probamos todo y, si el bot no está listo a tiempo, generamos igual la evidencia "un caficultor crea un lote": la transacción es la misma.
+
+**Fuera del sprint:** fotos de tenencia y de árboles, el cuestionario completo del paso 1.5 del PDF, y consultar "mis lotes" (salvo que sobre tiempo).
 
 ### 2.5 Modelo de datos (cambios sobre lo que ya existe)
 
@@ -234,13 +246,12 @@ La cuenta tiene que existir antes de firmar, y el faucet lo garantiza. Si `signX
 
 Lo que ya está hecho aparece en [Estado](#estado). Falta:
 
-- Probar Cavos con el App ID real (Jonatan).
-- Token del bot real y staging.
+- Proponerle a VoiceLedger el contrato JSON (§2.4) y staging.
 - Avisarle a Alejandra del cambio de los caficultores sin wallet.
 
 ### Semana 1 (16–20 nov): Auth y wallets invisibles — *entregable 1 del SOW*
 
-**Objetivo:** el personal entra con email desde el teléfono y recibe una dirección Stellar fondeada sin hacer nada. El caficultor que se vincula por el bot queda registrado on-chain.
+**Objetivo:** el personal entra con email desde el teléfono y recibe una dirección Stellar fondeada sin hacer nada. El caficultor que se vincula por el bot de VoiceLedger queda registrado on-chain.
 
 - Cavos en staging, con el App ID real, para email y Telegram.
 - Deploy de la cuenta Cavos en el primer login (spike de §2.3).
@@ -252,20 +263,22 @@ Lo que ya está hecho aparece en [Estado](#estado). Falta:
 - **Wallet de caficultores:**
   - identidad `cofi-farmer-agent`, fondeada y configurada en el backend;
   - servicio para firmar y enviar con esa cuenta.
-- Bot: la vinculación del caficultor llama `register_farmer` con la wallet de caficultores, sobre el contrato v0 adaptado o directamente sobre el v1 si ya está.
-- Staging accesible para Karla y WHH.
+- **Integración con VoiceLedger:**
+  - endpoint con firma HMAC, timestamp y `event_id` (§2.4);
+  - `farmer.linked` llama `register_farmer` con la wallet de caficultores, sobre el contrato v0 adaptado o directamente sobre el v1 si ya está.
+- Staging accesible para Karla, WHH y VoiceLedger (URL de la API y secreto de la integración).
 
 **Demo visual:**
 
 1. Login con email en el teléfono.
 2. La dirección aparece en el perfil con su saldo, y el pago del faucet se ve en Stellar Expert.
-3. En Telegram, un caficultor escribe su ID y el bot responde con el enlace a su registro on-chain.
+3. Un caficultor se vincula (por el bot de VoiceLedger, o con el simulador si todavía no está) y la respuesta trae el enlace a su registro on-chain.
 
 **Evidencia del SOW:** link a staging y el repo.
 
 ### Semana 2 (23–27 nov): Contratos con permisos por rol — *entregable 2 del SOW*
 
-**Objetivo:** el contrato v1 hace cumplir quién puede hacer qué, y el caficultor ya usa el bot de punta a punta hasta registrar una entrega.
+**Objetivo:** el contrato v1 hace cumplir quién puede hacer qué, y la API ya recibe de VoiceLedger todo lo del caficultor hasta registrar una entrega.
 
 - Contrato `traceability` v1 (§2.2):
   - wallet de caficultores, perfil editable, entrega inmutable, peso y recibo inmutables, etapas y documentos;
@@ -275,14 +288,15 @@ Lo que ya está hecho aparece en [Estado](#estado). Falta:
   - cliente del contrato v1;
   - migración de `Farmer` y `Batch`;
   - el servicio de caficultores firma con la wallet de caficultores.
-- Bot:
+- API de VoiceLedger:
   - consentimiento EUDR;
   - perfil de la finca y prácticas, con edición;
-  - registro de la entrega (`create_batch`).
+  - registro de la entrega (`create_batch`);
+  - simulador y documentación OpenAPI.
 
 **Demo visual:**
 
-1. Un caficultor acepta el consentimiento, carga su finca compartiendo la ubicación y registra una entrega desde Telegram. Cada paso tiene su enlace a Stellar Expert.
+1. Un caficultor acepta el consentimiento, carga su finca y registra una entrega desde el bot de VoiceLedger (o el simulador). Cada paso tiene su enlace a Stellar Expert.
 2. Salida de `cargo test` con los casos no autorizados rechazados.
 
 **Evidencia del SOW:** el contrato en el explorador y el repo con los tests.
@@ -302,10 +316,10 @@ Lo que ya está hecho aparece en [Estado](#estado). Falta:
 - **Exportar CSV:**
   - lotes con su historial (IDs seudónimos, sin datos personales);
   - caficultores con su estado (solo para el personal).
-- Bot: avisos al caficultor cuando se registra el peso y en cada cambio de etapa.
+- Avisos hacia VoiceLedger cuando se registra el peso y en cada cambio de etapa, para que su bot le escriba al caficultor.
 - Firma con Cavos: `signXdr` con nuestro fee-bump, o `invokeContract` si `signXdr` falla.
 
-**Demo visual:** el caficultor registra su entrega por Telegram. El Collector la pesa en la web y el caficultor recibe "Tu lote 01-12-2026 KK-ID001 fue recibido en Kirkir: 45 kg". El lote avanza de etapa, alguien sube un documento y se exporta el CSV.
+**Demo visual:** el caficultor registra su entrega por el bot de VoiceLedger. El Collector la pesa en la web y el caficultor recibe "Tu lote 01-12-2026 KK-ID001 fue recibido en Kirkir: 45 kg". El lote avanza de etapa, alguien sube un documento y se exporta el CSV.
 
 ### Semana 4 (7–11 dic): Pruebas, demo y documentación — *cierre del SOW*
 
@@ -315,12 +329,12 @@ Lo que ya está hecho aparece en [Estado](#estado). Falta:
   1. un caficultor crea un lote;
   2. un Collector agrega un evento autorizado;
   3. un intento no autorizado es rechazado.
-- Tests automáticos de permisos en CI: los del contrato, más los de la API (cada rol contra cada endpoint).
+- Tests automáticos de permisos en CI: los del contrato, más los de la API (cada rol contra cada endpoint, y la integración con firma inválida, mensaje repetido e ID que no está en la lista).
 - Validación con usuarios de prueba: Karla, WHH y algunos caficultores y personal de las cooperativas. Se corrige lo que salga.
 - **Documentación open source:** README de cada parte, arquitectura, cómo correrlo y cómo verificar un lote.
 - **Video demo:**
   1. login con email;
-  2. entrega por Telegram;
+  2. entrega por el bot de VoiceLedger (o el simulador);
   3. peso;
   4. etapas;
   5. documento;
@@ -335,8 +349,8 @@ Lo que **no se toca** es lo que el SOW pide como evidencia: login por email con 
 
 Se recorta en este orden:
 
-1. Los avisos del bot (el caficultor puede preguntarle a la coop).
-2. La edición del perfil desde el bot (queda solo la carga inicial, también on-chain).
+1. Los avisos hacia VoiceLedger (el caficultor puede preguntarle a la coop).
+2. La edición del perfil (queda solo la carga inicial, también on-chain).
 3. Los formularios específicos de cada etapa (quedan notas y foto).
 4. El login con Telegram para el personal (queda email, que es lo que pide el SOW).
 5. El CSV de caficultores (queda el de lotes).
@@ -351,7 +365,7 @@ Se recorta en este orden:
   - App ID (Jonatan);
   - ¿el relayer patrocina cuentas en testnet con nuestro plan?
   - ¿hay forma de crear la cuenta sin un pago?
-- [ ] ¿Quién crea y administra el **bot de Telegram** (nombre y cuenta dueña)?
+- [ ] **VoiceLedger:** ¿aceptan el contrato JSON de §2.4? ¿Cuándo tienen el bot en staging? ¿Nos mandan transcripción o audio? ¿Avisos por webhook o por consulta? ¿En qué idiomas reconoce la voz?
 - [ ] ¿Dónde se aloja staging?
 - [ ] ¿Alejandra está de acuerdo con que los caficultores firmen a través de la wallet del backend?
 - [ ] ¿Quiénes son los usuarios de prueba de la semana 4, y cuándo están disponibles?
@@ -360,7 +374,7 @@ Se recorta en este orden:
 
 - [ ] Factor de conversión de **fachasa a hectáreas**.
 - [ ] ¿Qué campos mínimos lleva el perfil de la finca y qué prácticas se preguntan en esta versión?
-- [ ] ¿En qué idiomas va el bot para las pruebas (inglés, afaan oromo, amárico) y quién traduce?
+- [ ] ¿Quién revisa las traducciones de la webapp a afaan oromo y amárico?
 
 **Semana 3**
 
@@ -382,6 +396,8 @@ Se recorta en este orden:
   - Si se filtra su clave, alguien podría registrar entregas falsas, pero no tocar etapas, pesos ni roles.
   - La clave vive solo en el backend y el admin puede cambiar la wallet con `set_farmer_agent`.
 - **GPS escrito:** es propenso a errores. Se valida que las coordenadas caigan dentro de Gomma y se pide confirmación.
+- **Dependencia de VoiceLedger:** la evidencia "un caficultor crea un lote" pasa por su bot. Mitigación: acordar el contrato JSON en la semana 0 y tener el simulador en la semana 2; la transacción on-chain es la misma venga de su bot o del simulador.
+- **Datos que llegan por voz:** pueden venir mal transcritos (IDs, kg, coordenadas). Validamos todo del lado nuestro y devolvemos errores claros para que el bot pida confirmación.
 - **Respuestas de Etiopía:** si no llegan a tiempo, se avanza con supuestos configurables.
 
 ---
@@ -390,7 +406,6 @@ Se recorta en este orden:
 
 Lo que el PDF de Karla pide y el SOW no cubre. Es el candidato para el siguiente Instaward o para el SCF Build Award, y para preparar el piloto con 200 caficultores.
 
-- Voz con VoiceLedger.
 - Carga y onboarding de los 200 caficultores, más QA en campo con teléfonos básicos y conexiones lentas.
 - Cuestionario completo del paso 1.5 (prácticas, más los 6 puntos extra), fotos de tenencia y de árboles.
 - Polígonos para fincas de 4 ha o más y mapa de parcelas.
@@ -398,5 +413,5 @@ Lo que el PDF de Karla pide y el SOW no cubre. Es el candidato para el siguiente
 - Dashboard con indicadores (caficultores, lotes por etapa, kg, precios y montos pagados).
 - Precio diario por cooperativa (Committee Member), registro financiero de la cooperativa, calificación de calidad y datos de venta (precio y costos).
 - Página pública del lote con QR. Depende de qué información es pública y cuál es solo para miembros.
-- Consultar "mis lotes" desde el bot y aviso de venta.
-- Traducciones completas de la web y del bot.
+- Consultar "mis lotes" desde el bot de VoiceLedger y aviso de venta.
+- Revisión profesional de las traducciones de la web.
