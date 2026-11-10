@@ -17,16 +17,16 @@ export class StellarClient {
 
 	constructor(network?: string) {
 		// `||` y no `??`: una variable definida pero vacía en el .env tiene que caer
-		// en el default, no quedar como string vacío.
-		this.network = network || process.env.STELLAR_NETWORK || 'mainnet';
+		// en el default, no quedar como string vacío. El default es testnet: un
+		// .env incompleto nunca tiene que terminar operando con fondos reales.
+		this.network = network || process.env.STELLAR_NETWORK || 'testnet';
 		this.deployment = getDeployment(this.network);
 		this.networkPassphrase = this.deployment.networkPassphrase;
 		this.rpc = new rpc.Server(process.env.STELLAR_RPC_URL || this.deployment.rpcUrl);
 	}
 
 	/**
-	 * Cuenta del backend. Paga los fees vía fee-bump, crea las cuentas de los
-	 * usuarios y es el admin del contrato.
+	 * Cuenta del backend. Paga los fees vía fee-bump y es el admin del contrato.
 	 */
 	public getServiceKeypair(): Keypair {
 		const secret = process.env.STELLAR_ADMIN_SECRET;

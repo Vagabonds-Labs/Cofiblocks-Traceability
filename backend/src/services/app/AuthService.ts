@@ -29,15 +29,13 @@ export async function refreshAccessToken(refreshToken: string): Promise<{ access
       throw new HttpException(401, 'Refresh token expired');
     }
 
-    // Check if session is still active
-    if (tokenRecord.session && !tokenRecord.session.isActive) {
+    // Toda sesión emitida tiene su refresh token ligado. Sin sesión, o con la
+    // sesión cerrada, no se renueva.
+    if (!tokenRecord.sessionId || !tokenRecord.session || !tokenRecord.session.isActive) {
       throw new HttpException(401, 'Session has been revoked');
     }
 
-    // Update session last activity if session exists
-    if (tokenRecord.sessionId) {
-        await dbSessions.updateLastActivity(tokenRecord.sessionId)
-    }
+    await dbSessions.updateLastActivity(tokenRecord.sessionId);
 
     // Generate new access token
     const accessToken = jwtService.generateAccessToken({
@@ -46,6 +44,7 @@ export async function refreshAccessToken(refreshToken: string): Promise<{ access
       role: tokenRecord.user.role,
       organization_id: tokenRecord.user.organizationId,
       walletAddress: tokenRecord.user.walletAddress || '',
+      sessionId: tokenRecord.sessionId,
     });
 
     return { accessToken };
@@ -94,20 +93,19 @@ export async function createSession(
 }
 
 
-export async function revokeRefreshToken(refreshToken: string): Promise<void> {
-  const session = await dbSessions.findSessionByRefreshTokenForRevoke(refreshToken);
-  if (session) {
-    await dbRefreshToken.deleteRefreshTokenByToken(refreshToken);
-    await dbSessions.deleteSession(session.id);
-  }
-}
-
 export async function getUserSessions(userId: string): Promise<SessionEntry[]> {
   return await dbSessions.getUserSessions(userId);
 }
 
-export async function getSessionByRefreshToken(refreshToken: string): Promise<SessionEntry | null> {
-  return await dbSessions.findSessionByRefreshToken(refreshToken);
+/**
+ * Usuario con sus permisos actuales, si la sesión del token sigue activa.
+ *
+ * El middleware lo consulta en cada pedido en vez de confiar en el token: así
+ * cerrar sesión, revocarla, borrar al usuario o quitarle el admin tiene efecto
+ * inmediato, sin esperar a que venza el access token.
+ */
+export async function getActiveSessionUser(sessionId: string, userId: string) {
+  return await dbSessions.findActiveSessionWithUser(sessionId, userId);
 }
 
 export async function revokeAllUserSessions(userId: string): Promise<void> {
@@ -115,9 +113,15 @@ export async function revokeAllUserSessions(userId: string): Promise<void> {
   await dbRefreshToken.deleteRefreshTokensByUserId(userId);
 }
 
-export async function revokeSession(sessionId: string): Promise<void> {
-  await dbRefreshToken.deleteRefreshTokensBySessionId(sessionId);
-  await dbSessions.deleteSession(sessionId);
+/**
+ * Revoca una sesión del usuario. Si el ID no es de una sesión suya (ajena o
+ * inexistente) responde 404 sin tocar nada.
+ */
+export async function revokeSession(sessionId: string, userId: string): Promise<void> {
+  const deleted = await dbSessions.deleteUserSession(sessionId, userId);
+  if (!deleted) {
+    throw new HttpException(404, 'Session not found', 'SESSION_NOT_FOUND');
+  }
 }
 
 export function getDeviceInfo(userAgent: string | undefined): string {

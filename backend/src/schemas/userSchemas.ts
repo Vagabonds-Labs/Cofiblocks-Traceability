@@ -20,10 +20,9 @@ export const refreshTokenSchema = z.object({
 /**
  * Logout schema
  */
+// El logout cierra la sesión del access token; no lee ningún refresh token.
 export const logoutSchema = z.object({
-  body: z.object({
-    refreshToken: z.string().optional(), // Optional because it can come from cookie
-  }),
+  body: z.object({}).passthrough(),
 });
 
 /**

@@ -1,61 +1,61 @@
-# Stage 1: Build stage
+# Imagen del backend.
+#
+#   docker build -t cofiblocks-backend .
+#
+# Al arrancar aplica las migraciones pendientes y levanta la API en el puerto
+# 4000. Las variables de entorno (base, secretos JWT, Stellar…) se pasan en
+# tiempo de ejecución: el backend no arranca sin secretos JWT válidos.
+
+# ── Build ────────────────────────────────────────────────────────────────
 FROM node:20-alpine AS builder
+
+# Prisma necesita OpenSSL para elegir su motor en Alpine.
+RUN apk add --no-cache openssl
 
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+# El schema y la config de Prisma van antes de instalar: el `postinstall`
+# corre `prisma generate` y los necesita.
+COPY package*.json prisma.config.ts ./
 COPY prisma ./prisma/
+RUN npm ci
 
-# Install all dependencies
-RUN npm i
-
-# Generate Prisma Client
-RUN npx prisma generate
-
-# Copy source
 COPY tsconfig.json ./
 COPY src ./src
-
-# Build TS and fix path aliases
+# Las traducciones de las notificaciones se importan desde src/utils.
+COPY locales ./locales
 RUN npm run build
 
-# Stage 2: Production stage
+# Quita las dependencias de desarrollo y conserva el cliente de Prisma ya
+# generado (node_modules/.prisma).
+RUN npm prune --omit=dev && npm cache clean --force
+
+# ── Runtime ──────────────────────────────────────────────────────────────
 FROM node:20-alpine AS production
 
 ENV NODE_ENV=production
 
 WORKDIR /app
 
-# Install dumb-init for proper signal handling
-RUN apk add --no-cache dumb-init
+# dumb-init para manejar señales; OpenSSL para el motor de Prisma.
+RUN apk add --no-cache dumb-init openssl
 
-# Create non-root user
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nodejs -u 1001
 
-# Copy package files
-COPY package*.json ./
-
-# Install only production dependencies
-RUN npm ci --omit=dev && npm cache clean --force
-
-# Copy prisma folder (schema + migrations)
-COPY prisma ./prisma/
-
-# Copy generated Prisma Client + built app
-COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
-COPY --from=builder /app/dist ./dist
-
-# Change ownership
-RUN chown -R nodejs:nodejs /app
+COPY --from=builder --chown=nodejs:nodejs /app/package*.json /app/prisma.config.ts ./
+COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=nodejs:nodejs /app/prisma ./prisma
+COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
+# El código compilado lee las traducciones desde /app/locales.
+COPY --from=builder --chown=nodejs:nodejs /app/locales ./locales
 
 USER nodejs
 
 EXPOSE 4000
 
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:4000/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:4000/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)}).on('error', () => process.exit(1))"
 
 ENTRYPOINT ["dumb-init", "--"]
 

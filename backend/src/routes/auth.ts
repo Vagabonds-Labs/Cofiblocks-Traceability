@@ -51,11 +51,11 @@ router.post('/refresh', validate(refreshTokenSchema), async (req: Request, res: 
   
   
   router.post('/logout', authenticate, validate(logoutSchema), async (req: Request, res: Response, next) => {
-    const refreshToken = getRefreshToken(req);
-    if (refreshToken) {
-      await AuthService.revokeRefreshToken(refreshToken);
-    }
-  
+    // Se cierra la sesión del access token, que ya validó `authenticate`. Antes
+    // se usaba el refresh token que mandara el cliente: sin él, la sesión
+    // quedaba abierta; con el de otra sesión, cerraba esa y no la propia.
+    await AuthService.revokeSession(req.user!.sessionId, req.user!.userId);
+
     clearRefreshTokenCookie(res);
     clearAccessTokenCookie(res);
     successResponse(res, null, 'Logged out successfully', 200);
@@ -87,13 +87,15 @@ router.delete(
 {
     const { sessionId } = req.params;
     const userId = req.user!.userId;
-  
-    // Verify session belongs to user
-    const session = await AuthService.getSessionByRefreshToken(sessionId);
-    if (session && session.userId !== userId) {
-      throw new HttpException(403, 'You can only revoke your own sessions', 'FORBIDDEN');
+
+    // Borra sólo si la sesión es del usuario (id y dueño en la misma consulta).
+    await AuthService.revokeSession(sessionId, userId);
+
+    // Si revocó la sesión desde la que está pidiendo, también se le cierran las cookies.
+    if (sessionId === req.user!.sessionId) {
+      clearRefreshTokenCookie(res);
+      clearAccessTokenCookie(res);
     }
-    await AuthService.revokeSession(sessionId);
     successResponse(res, null, 'Session revoked successfully', 200);
   });
   
@@ -135,8 +137,9 @@ router.delete(
     }
 
     // Las transacciones que firma el usuario lo usan como source account, así
-    // que la cuenta tiene que existir en la red. Se crea en segundo plano para
-    // no demorar el login; si falla, se reintenta en el próximo.
+    // que la cuenta tiene que existir en la red. En testnet la crea Friendbot
+    // (sin gastar saldo del backend), en segundo plano para no demorar el
+    // login; si falla, se reintenta en el próximo.
     //
     // Las cuentas de Cavos NO: las crea Cavos con sus propios datos y firmantes.
     // Si la creáramos antes, Cavos la vería "desplegada" sin sus datos y dejaría

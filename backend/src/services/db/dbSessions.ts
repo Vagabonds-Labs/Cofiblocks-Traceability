@@ -20,6 +20,14 @@ export interface SessionEntry {
     expiresAt: Date;
   }
 
+export interface ActiveSessionUser {
+    id: string;
+    walletAddress: string | null;
+    isAdmin: boolean;
+    role: string | null;
+    organizationId: string | null;
+}
+
 export class DbSessions {
     async createSession(data: CreateSessionEntry): Promise<SessionEntry> {
         const session = await prisma.session.create({
@@ -40,27 +48,46 @@ export class DbSessions {
         return session;
     }
 
-    async findSessionByRefreshToken(refreshToken: string): Promise<SessionEntry | null> {
+    /**
+     * Sesión activa y vigente de un usuario, con los permisos actuales del
+     * usuario. `null` si la sesión no existe, es de otro usuario, se cerró o
+     * venció.
+     */
+    async findActiveSessionWithUser(sessionId: string, userId: string): Promise<ActiveSessionUser | null> {
         const session = await prisma.session.findFirst({
             where: {
-                refreshToken: {
-                    token: refreshToken,
-                },
+                id: sessionId,
+                userId,
+                isActive: true,
+                expiresAt: { gt: new Date() },
             },
             select: {
-                id: true,
-                userId: true,
-                ipAddress: true,
-                userAgent: true,
-                deviceInfo: true,
-                isActive: true,
-                lastActivity: true,
-                createdAt: true,
-                expiresAt: true,
+                user: {
+                    select: {
+                        id: true,
+                        walletAddress: true,
+                        isAdmin: true,
+                        role: true,
+                        organizationId: true,
+                    },
+                },
             },
         });
 
-        return session;
+        return session?.user ?? null;
+    }
+
+    /**
+     * Borra una sesión y su refresh token, sólo si es del usuario indicado.
+     * Devuelve `false` si no había una sesión así: el usuario no puede tocar
+     * sesiones ajenas.
+     */
+    async deleteUserSession(sessionId: string, userId: string): Promise<boolean> {
+        const [, deleted] = await prisma.$transaction([
+            prisma.refreshToken.deleteMany({ where: { sessionId, userId } }),
+            prisma.session.deleteMany({ where: { id: sessionId, userId } }),
+        ]);
+        return deleted.count > 0;
     }
 
     async getUserSessions(userId: string): Promise<SessionEntry[]> {
@@ -104,21 +131,6 @@ export class DbSessions {
         await prisma.session.delete({
             where: { id: sessionId },
         });
-    }
-
-    async findSessionByRefreshTokenForRevoke(refreshToken: string): Promise<{ id: string } | null> {
-        const session = await prisma.session.findFirst({
-            where: {
-                refreshToken: {
-                    token: refreshToken,
-                },
-            },
-            select: {
-                id: true,
-            },
-        });
-
-        return session;
     }
 
     async markAllSessionsInactive(userId: string): Promise<void> {

@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { JwtService } from '../services/app/JwtService';
 import { HttpException } from '../exceptions/HttpException';
-import { prisma } from '../lib/prisma';
+import * as AuthService from '../services/app/AuthService';
 import { getAccessToken } from '../utils/authUtils';
 
 // Extend Express Request to include user info
@@ -10,6 +10,7 @@ declare global {
     interface Request {
       user?: {
         userId: string;
+        sessionId: string;
         walletAddress: string;
         role: string | null;
         organization_id: string | null;
@@ -22,8 +23,35 @@ declare global {
 const jwtService = new JwtService();
 
 /**
+ * Usuario del pedido, o `null` si el token no sirve.
+ *
+ * La firma del token sólo prueba quién es y en qué sesión entró. Los permisos
+ * (admin, rol, organización) se leen de la base en cada pedido, y la sesión
+ * tiene que seguir activa: cerrar sesión, revocarla, borrar al usuario o
+ * quitarle el admin corta el acceso al instante. Antes los permisos salían del
+ * token y seguían valiendo hasta que vencía.
+ */
+async function resolveUser(token: string): Promise<Request['user'] | null> {
+  const payload = jwtService.verifyAccessToken(token);
+  if (!payload) return null;
+
+  const user = await AuthService.getActiveSessionUser(payload.sessionId, payload.userId);
+  if (!user) return null;
+
+  return {
+    userId: user.id,
+    sessionId: payload.sessionId,
+    walletAddress: user.walletAddress ?? '',
+    role: user.role,
+    organization_id: user.organizationId,
+    is_admin: user.isAdmin,
+  };
+}
+
+/**
  * Authentication middleware
- * Verifies JWT access token and attaches user info to request
+ * Verifies the access token, checks that its session is still active and
+ * attaches the user's current permissions to the request.
  */
 export const authenticate = async (req: Request, _: Response, next: NextFunction) => {
   try {
@@ -34,20 +62,12 @@ export const authenticate = async (req: Request, _: Response, next: NextFunction
       throw new HttpException(401, 'Access token is missing', 'MISSING_TOKEN');
     }
 
-    // Verify token
-    const payload = jwtService.verifyAccessToken(token);
-    if (!payload) {
+    const user = await resolveUser(token);
+    if (!user) {
       throw new HttpException(401, 'Invalid or expired token', 'INVALID_TOKEN');
     }
 
-    // Attach user info to request
-    req.user = {
-      userId: payload.userId,
-      walletAddress: payload.walletAddress,
-      role: payload.role,
-      organization_id: payload.organization_id,
-      is_admin: payload.is_admin
-    };
+    req.user = user;
     next();
   } catch (error) {
     // If it's already an HttpException, pass it through
@@ -71,17 +91,8 @@ export const optionalAuthenticate = async (
     const token = getAccessToken(req);
 
     if (token) {
-      const payload = jwtService.verifyAccessToken(token);
-
-      if (payload) {
-        req.user = {
-          userId: payload.userId,
-          walletAddress: payload.walletAddress,
-          role: payload.role,
-          organization_id: payload.organization_id,
-          is_admin: payload.is_admin,
-        };
-      }
+      const user = await resolveUser(token);
+      if (user) req.user = user;
     }
 
     next();

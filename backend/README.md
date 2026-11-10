@@ -97,7 +97,7 @@ Todos bajo `/api`.
 | Método y ruta | Quién | Qué hace |
 |---|---|---|
 | `POST /auth/nonce` | todos | Pide el mensaje a firmar. |
-| `POST /auth/register_wallet` | todos | Verifica la firma e inicia sesión. Si el usuario usa una wallet propia y su cuenta Stellar no existe, la crea. |
+| `POST /auth/register_wallet` | todos | Verifica la firma e inicia sesión. Si el usuario usa una wallet propia y su cuenta Stellar no existe, la crea con Friendbot (solo en testnet; el backend no gasta saldo propio). |
 | `POST /auth/refresh`, `POST /auth/logout` | sesión | Renueva o cierra la sesión. |
 | `GET /auth/me` | sesión | Usuario actual con su rol, organización y centro. |
 | `GET /auth/sessions`, `DELETE /auth/sessions[/:sessionId]` | sesión | Sesiones abiertas. |
