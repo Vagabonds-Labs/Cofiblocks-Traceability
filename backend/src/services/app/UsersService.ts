@@ -1,23 +1,26 @@
-import { Prisma, SellerType } from '@prisma/client';
+import { OrganizationKind, Prisma, StaffRole } from '@prisma/client';
+
 import { HttpException } from '@/exceptions/HttpException';
-import { DbUsers, UserEntry, CreateUserEntry, UpdateUserEntry, DbRefreshToken, DbSessions } from '@/services/db';
-import { RegisterUserData, UserResponse } from './types';
+import { prisma } from '@/lib/prisma';
+import { logger } from '@/lib/logger';
+import { DbRefreshToken, DbSessions, DbUsers, UserEntry } from '@/services/db';
+import * as OnChainTraceabilityService from '@/services/onchain/OnChainTraceabilityService';
 import { verifyStellarSignature } from '@/utils/stellarSignature';
 import * as NonceService from './NonceService';
-import * as OnChainRolesService from '@/services/onchain/OnChainRolesService';
-import { ROLES } from '@/lib/StellarContracts/types';
-import { logger } from '@/lib/logger';
+import * as NotificationService from './NotificationService';
+import { RegisterUserData, UserResponse } from './types';
 
 const dbUsers = new DbUsers();
 const dbRefreshToken = new DbRefreshToken();
 const dbSessions = new DbSessions();
 
 export async function getUserById(userId: string) {
-    const user = await dbUsers.findUserById(userId);
-    return user;
+  return dbUsers.findUserById(userId);
 }
 
-export async function registerUser(data: RegisterUserData): Promise<{ user: UserEntry; isNewUser: boolean }> {
+export async function registerUser(
+  data: RegisterUserData
+): Promise<{ user: UserEntry; isNewUser: boolean }> {
   if (!data.signature) {
     throw new HttpException(400, 'Signature is required for wallet registration');
   }
@@ -32,184 +35,155 @@ export async function registerUser(data: RegisterUserData): Promise<{ user: User
     data.signature
   );
 
-  // Check if user with this wallet address already exists
   const existingUser = await dbUsers.findUserByWalletAddress(data.walletAddress);
-
-  let user: UserEntry;
-  let isNewUser = false;
-
   if (existingUser) {
-    // User exists - this is a login
-    user = existingUser;
-  } else {
-    // User doesn't exist - create new user
-    isNewUser = true;
-    const createData: CreateUserEntry = {
-      walletAddress: data.walletAddress,
-      walletProvider: data.walletProvider || 'stellar',
-      sellerType: null,
-      isAdmin: false,
-    };
-    user = await dbUsers.createUser(createData);
+    return { user: existingUser, isNewUser: false };
   }
 
-  return { user, isNewUser };
+  const user = await dbUsers.createUser({
+    walletAddress: data.walletAddress,
+    walletProvider: data.walletProvider || 'stellar',
+    isAdmin: false,
+  });
+  return { user, isNewUser: true };
 }
 
-export async function assertUserIsSeller(userId: string) {
-  const user = await dbUsers.findUserById(userId);
-  if (!user) {
-    throw new HttpException(404, 'User not found', 'USER_NOT_FOUND');
-  }
-  if (!user.sellerType || user.sellerType !== 'PRODUCER') {
-    throw new HttpException(404, 'User is not a producer', 'USER_NOT_A_PRODUCER');
-  }
-}
-
-
-/**
- * Find a user by ID
- */
-export async function findById(id: string) {
-  return await dbUsers.findUserById(id);
-}
-
-/**
- * Find a user by wallet address
- */
-export async function findByWalletAddress(walletAddress: string) {
-  return await dbUsers.findUserByWalletAddress(walletAddress);
-}
-
-
-  /**
-   * Update user information (name and/or email)
-   */
 export async function updateUser(
   userId: string,
   data: { name?: string; email?: string }
 ): Promise<UserResponse> {
-  // Build update object with only provided fields
-  const updateData: UpdateUserEntry = {};
-  if (data.name !== undefined) {
-    updateData.name = data.name;
-  }
-  if (data.email !== undefined) {
-    updateData.email = data.email;
-  }
-  // Update user in database
-  return await dbUsers.updateUser(userId, updateData);
+  return dbUsers.updateUser(userId, data);
 }
 
-  /**
-   * Update user seller type
-   */
-export async function updateSellerType(
-    userId: string,
-    sellerType: SellerType | null
-  ): Promise<UserResponse> {
-    return await dbUsers.updateUser(userId, { sellerType });
+/** Lista de usuarios con filtros y paginación (admin). */
+export async function getAllUsers(filters: {
+  role?: StaffRole;
+  organizationId?: string;
+  isAdmin?: boolean;
+  email?: string;
+  name?: string;
+  walletAddress?: string;
+  walletProvider?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<{ users: UserResponse[]; total: number }> {
+  const where: Prisma.UserWhereInput = {};
+  if (filters.role) where.role = filters.role;
+  if (filters.organizationId) where.organizationId = filters.organizationId;
+  if (filters.isAdmin !== undefined) where.isAdmin = filters.isAdmin;
+  if (filters.email) where.email = { contains: filters.email, mode: 'insensitive' };
+  if (filters.name) where.name = { contains: filters.name, mode: 'insensitive' };
+  if (filters.walletAddress) {
+    where.walletAddress = { contains: filters.walletAddress, mode: 'insensitive' };
+  }
+  if (filters.walletProvider) {
+    where.walletProvider = { contains: filters.walletProvider, mode: 'insensitive' };
   }
 
-  /**
-   * Get all users with filtering and pagination (admin only)
-   */
-  export async function getAllUsers(filters: {
-    sellerType?: SellerType;
-    isAdmin?: boolean;
-    email?: string;
-    name?: string;
-    walletAddress?: string;
-    walletProvider?: string;
-    limit?: number;
-    offset?: number;
-  }): Promise<{ users: UserResponse[]; total: number }> {
-    // Build where clause for filtering
-    const where: Prisma.UserWhereInput = {};
-
-    if (filters.sellerType !== undefined) {
-      where.sellerType = filters.sellerType;
-    }
-
-    if (filters.isAdmin !== undefined) {
-      where.isAdmin = filters.isAdmin;
-    }
-
-    if (filters.email) {
-      where.email = {
-        contains: filters.email,
-        mode: 'insensitive',
-      };
-    }
-
-    if (filters.name) {
-      where.name = {
-        contains: filters.name,
-        mode: 'insensitive',
-      };
-    }
-
-    if (filters.walletAddress) {
-      where.walletAddress = {
-        contains: filters.walletAddress,
-        mode: 'insensitive',
-      };
-    }
-
-    if (filters.walletProvider) {
-      where.walletProvider = {
-        contains: filters.walletProvider,
-        mode: 'insensitive',
-      };
-    }
-
-    // Get total count
-    const total = await dbUsers.countUsers(where);
-
-    // Ensure limit and offset are numbers
-    const limit = typeof filters.limit === 'number' ? filters.limit : (filters.limit ? parseInt(String(filters.limit), 10) : 50);
-    const offset = typeof filters.offset === 'number' ? filters.offset : (filters.offset ? parseInt(String(filters.offset), 10) : 0);
-
-    // Get users with pagination
-    const users = await dbUsers.findUsersWithFilters(where, limit, offset);
-
-    return { users, total };
-  }
-
-/**
- * Update user admin status (admin only)
- */
-export async function updateAdminStatus(
-  userId: string,
-  isAdmin: boolean
-): Promise<UserResponse> {
-  return await dbUsers.updateUser(userId, { isAdmin });
+  const limit = filters.limit ?? 50;
+  const offset = filters.offset ?? 0;
+  const [total, users] = await Promise.all([
+    dbUsers.countUsers(where),
+    dbUsers.findUsersWithFilters(where, limit, offset),
+  ]);
+  return { users, total };
 }
 
-  /**
-   * Delete a user (admin only)
-   */
+export async function updateAdminStatus(userId: string, isAdmin: boolean): Promise<UserResponse> {
+  return dbUsers.updateUser(userId, { isAdmin });
+}
+
 export async function deleteUser(userId: string): Promise<void> {
   await dbRefreshToken.deleteRefreshTokensByUserId(userId);
   await dbSessions.markAllSessionsInactive(userId);
-
-  // Delete the user
   await dbUsers.deleteUser(userId);
 }
 
-
-export async function updateUserSellerType(userId: string, sellerType: SellerType | null): 
-Promise<{ user: UserResponse, tx_hash: string | null }> {
-  let tx_hash: string | null = null;
-  if (sellerType) {
-    const user = await dbUsers.findUserById(userId);
-    if (!user || !user.walletAddress) {
-      throw new HttpException(404, 'User not found', 'USER_NOT_FOUND');
-    }
-    logger.info(`Assigning role ${sellerType} to wallet ${user.walletAddress}`);
-    tx_hash = await OnChainRolesService.assignRole(sellerType as ROLES, user.walletAddress);
+/**
+ * Asigna un rol del piloto a un usuario: primero en el contrato (firma el
+ * backend como admin) y, si la transacción se confirma, en la base.
+ *
+ * - El Export Manager pertenece a la unión; el resto, a una cooperativa.
+ * - El Coffee Collector necesita además su centro de acopio, que tiene que
+ *   ser de su misma cooperativa.
+ */
+export async function assignRole(
+  userId: string,
+  role: StaffRole,
+  organizationId: string,
+  collectionCenterId?: string | null
+): Promise<{ user: UserResponse; tx_hash: string }> {
+  const user = await dbUsers.findUserById(userId);
+  if (!user) throw new HttpException(404, 'User not found', 'USER_NOT_FOUND');
+  if (!user.walletAddress) {
+    throw new HttpException(400, 'User has no wallet', 'USER_WITHOUT_WALLET');
   }
 
-  const updatedUser = await dbUsers.updateUser(userId, { sellerType });
-  return { user: updatedUser, tx_hash };
+  const organization = await prisma.organization.findUnique({ where: { id: organizationId } });
+  if (!organization) {
+    throw new HttpException(404, 'Organization not found', 'ORGANIZATION_NOT_FOUND');
+  }
+  const expectedKind =
+    role === StaffRole.EXPORT_MANAGER ? OrganizationKind.UNION : OrganizationKind.COOPERATIVE;
+  if (organization.kind !== expectedKind) {
+    throw new HttpException(
+      400,
+      role === StaffRole.EXPORT_MANAGER
+        ? 'The Export Manager belongs to the union'
+        : 'This role belongs to a cooperative',
+      'ROLE_ORGANIZATION_MISMATCH'
+    );
+  }
+
+  let centerId: string | null = null;
+  if (role === StaffRole.COLLECTOR) {
+    if (!collectionCenterId) {
+      throw new HttpException(400, 'Collectors need a collection center', 'COLLECTION_CENTER_REQUIRED');
+    }
+    const center = await prisma.collectionCenter.findUnique({ where: { id: collectionCenterId } });
+    if (!center || center.organizationId !== organization.id) {
+      throw new HttpException(
+        400,
+        'The collection center does not belong to that cooperative',
+        'COLLECTION_CENTER_MISMATCH'
+      );
+    }
+    centerId = center.id;
+  }
+
+  const txHash = await OnChainTraceabilityService.grantRole(
+    user.walletAddress,
+    role,
+    organization.chainId
+  );
+
+  const updated = await dbUsers.updateUser(userId, {
+    role,
+    organizationId: organization.id,
+    collectionCenterId: centerId,
+    roleTx: txHash,
+  });
+  logger.info({ userId, role, organization: organization.code, txHash }, 'Role assigned');
+  await NotificationService.pushInfoNotification(userId, 'ROLE_ASSIGNED', [role]);
+  return { user: updated, tx_hash: txHash };
+}
+
+/** Quita el rol en el contrato y en la base. */
+export async function revokeRole(userId: string): Promise<{ user: UserResponse; tx_hash: string }> {
+  const user = await dbUsers.findUserById(userId);
+  if (!user) throw new HttpException(404, 'User not found', 'USER_NOT_FOUND');
+  if (!user.walletAddress || !user.role) {
+    throw new HttpException(400, 'User has no role to revoke', 'NO_ROLE');
+  }
+
+  const txHash = await OnChainTraceabilityService.revokeRole(user.walletAddress);
+  const updated = await dbUsers.updateUser(userId, {
+    role: null,
+    organizationId: null,
+    collectionCenterId: null,
+    roleTx: txHash,
+  });
+  logger.info({ userId, txHash }, 'Role revoked');
+  await NotificationService.pushInfoNotification(userId, 'ROLE_REVOKED', [user.role]);
+  return { user: updated, tx_hash: txHash };
 }

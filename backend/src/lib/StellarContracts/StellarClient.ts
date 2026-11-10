@@ -4,8 +4,7 @@ import { getDeployment, NetworkDeployment } from './deployments';
 
 /**
  * Punto único de acceso a la red: RPC de Soroban, Horizon y la cuenta con la
- * que el backend firma (asignación de roles, fee-bumps y patrocinio de
- * trustlines).
+ * que el backend firma (asignación de roles, fee-bumps y creación de cuentas).
  */
 export class StellarClient {
 	public readonly network: string;
@@ -26,8 +25,8 @@ export class StellarClient {
 	}
 
 	/**
-	 * Cuenta del backend. Paga los fees vía fee-bump, patrocina las trustlines de
-	 * USDC y es el admin de los contratos.
+	 * Cuenta del backend. Paga los fees vía fee-bump, crea las cuentas de los
+	 * usuarios y es el admin del contrato.
 	 */
 	public getServiceKeypair(): Keypair {
 		const secret = process.env.STELLAR_ADMIN_SECRET;
@@ -59,9 +58,8 @@ export class StellarClient {
 	 * La cuenta tal como la ve Horizon, o `null` si no existe en la red.
 	 *
 	 * Sólo un 404 significa "no existe". Cualquier otro error — Horizon caído,
-	 * una URL mal configurada — se propaga: antes se tragaba y se disfrazaba de
-	 * cuenta inexistente, y el usuario veía "USDC no habilitado" con la trustline
-	 * abierta.
+	 * una URL mal configurada — se propaga en vez de disfrazarse de cuenta
+	 * inexistente.
 	 */
 	public async loadAccountOrNull(address: string): Promise<Horizon.AccountResponse | null> {
 		try {

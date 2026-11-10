@@ -23,8 +23,8 @@ export class JwtService {
         userId: payload.userId,
         walletAddress: payload.walletAddress,
         is_admin: payload.is_admin,
-        is_producer: payload.is_producer,
-        is_roaster: payload.is_roaster,
+        role: payload.role,
+        organization_id: payload.organization_id,
         type: 'access',
       },
       this.accessTokenSecret,
@@ -43,8 +43,8 @@ export class JwtService {
         userId: payload.userId,
         walletAddress: payload.walletAddress,
         is_admin: payload.is_admin,
-        is_producer: payload.is_producer,
-        is_roaster: payload.is_roaster,
+        role: payload.role,
+        organization_id: payload.organization_id,
         sessionId: payload.sessionId,
         type: 'refresh',
       },
@@ -80,8 +80,8 @@ export class JwtService {
         userId: decoded.userId as string,
         walletAddress: decoded.walletAddress as string,
         is_admin: decoded.is_admin as boolean,
-        is_producer: decoded.is_producer as boolean,
-        is_roaster: decoded.is_roaster as boolean,
+        role: (decoded.role as string | null) ?? null,
+        organization_id: (decoded.organization_id as string | null) ?? null,
         sessionId: decoded.sessionId as string | undefined,
       };
     } catch (error) {
@@ -104,8 +104,8 @@ export class JwtService {
         userId: decoded.userId as string,
         walletAddress: decoded.walletAddress as string,
         is_admin: decoded.is_admin as boolean,
-        is_producer: decoded.is_producer as boolean,
-        is_roaster: decoded.is_roaster as boolean,
+        role: (decoded.role as string | null) ?? null,
+        organization_id: (decoded.organization_id as string | null) ?? null,
       };
     } catch (error) {
       return null;

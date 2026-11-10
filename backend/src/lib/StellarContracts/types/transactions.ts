@@ -1,9 +1,4 @@
-/**
- * Lo que el backend le devuelve al frontend para que la wallet firme.
- *
- * Reemplaza al `{ contract_address, entrypoint, calldata }` de Starknet: en
- * Stellar se firma una transacción entera, no un calldata.
- */
+/** Lo que el backend le devuelve al frontend para que la wallet firme. */
 export interface PreparedTransaction {
 	/** Sobre de transacción en base64, ya simulado (footprint, auth y fee dentro). */
 	xdr: string;
@@ -13,14 +8,8 @@ export interface PreparedTransaction {
 	valid_until: number;
 }
 
-/** Resultado de enviar una transacción firmada. */
+/** Resultado de enviar una transacción. */
 export interface SubmittedTransaction {
 	hash: string;
 	ledger: number;
-}
-
-/** Tokens que la app maneja. Se fueron STRK, USDT y USDC.e. */
-export enum PaymentToken {
-	XLM = "XLM",
-	USDC = "USDC",
 }

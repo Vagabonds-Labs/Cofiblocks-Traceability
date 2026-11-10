@@ -11,8 +11,8 @@ declare global {
       user?: {
         userId: string;
         walletAddress: string;
-        is_producer: boolean;
-        is_roaster: boolean;
+        role: string | null;
+        organization_id: string | null;
         is_admin: boolean;
       };
     }
@@ -44,8 +44,8 @@ export const authenticate = async (req: Request, _: Response, next: NextFunction
     req.user = {
       userId: payload.userId,
       walletAddress: payload.walletAddress,
-      is_producer: payload.is_producer,
-      is_roaster: payload.is_roaster,
+      role: payload.role,
+      organization_id: payload.organization_id,
       is_admin: payload.is_admin
     };
     next();
@@ -77,8 +77,8 @@ export const optionalAuthenticate = async (
         req.user = {
           userId: payload.userId,
           walletAddress: payload.walletAddress,
-          is_producer: payload.is_producer,
-          is_roaster: payload.is_roaster,
+          role: payload.role,
+          organization_id: payload.organization_id,
           is_admin: payload.is_admin,
         };
       }
@@ -112,24 +112,18 @@ export const requireAdmin = async (
 };
 
 /**
- * Seller authorization middleware
- * Checks if the authenticated user is a seller
- * Must be used after authenticate middleware
- * Seller type can be PRODUCER or ROASTER
+ * Exige que el usuario tenga uno de los roles del piloto.
+ * Se usa después de `authenticate`. Los admins pasan siempre.
  */
-export const requireSeller = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  if (!req.user || !req.user.userId) {
-    throw new HttpException(401, 'Authentication required', 'AUTH_REQUIRED');
-  }
-
-  const isSeller = req.user.is_producer || req.user.is_roaster;
-  if (!isSeller) {
-    throw new HttpException(403, 'Seller access required', 'SELLER_REQUIRED');
-  }
-  next();
-};
-
+export const requireRole =
+  (...roles: string[]) =>
+  async (req: Request, _res: Response, next: NextFunction) => {
+    if (!req.user || !req.user.userId) {
+      throw new HttpException(401, 'Authentication required', 'AUTH_REQUIRED');
+    }
+    if (req.user.is_admin) return next();
+    if (!req.user.role || !roles.includes(req.user.role)) {
+      throw new HttpException(403, 'Your role does not allow this action', 'ROLE_REQUIRED');
+    }
+    next();
+  };

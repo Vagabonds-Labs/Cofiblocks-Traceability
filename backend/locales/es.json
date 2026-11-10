@@ -1,15 +1,7 @@
 {
   "notifications": {
-    "welcome_message": "¡Bienvenido a CoFiBlocks! Tu cuenta ha sido creada exitosamente.",
-    "FARM_CREATED_SUCCESSFULLY": "Finca {0} creada exitosamente",
-    "PRODUCT_CREATED_SUCCESSFULLY": "Producto creado exitosamente, listo para ser desplegado en cadena",
-    "PRODUCT_DEPLOYMENT_SUCCESSFUL": "Producto desplegado exitosamente! Ahora está listo para ser vendido en la marketplace!",
-    "PRODUCT_DELETED_SUCCESSFULLY": "Producto eliminado exitosamente",
-    "ROLE_ASSIGNED": "Has sido asignado el rol de {0}",
-    "ROLE_REVOKED": "Has sido revocado el rol de {0}",
-    "DELIVERY_NOT_PAID": "No encontramos el pago de entrega para el pedido {0}. Por favor, contacta con soporte para obtener ayuda.",
-    "ORDER_PAID": "Tu pedido {0} ha sido pagado exitosamente y está siendo procesado",
-    "ORDER_RECEIVED": "¡Has vendido! Pedido {0}",
-    "ORDER_DELIVERED": "Tu pedido {0} ha sido entregado exitosamente"
+    "welcome_message": "¡Bienvenido a CofiBlocks Traceability! Un administrador te asignará tu rol en el piloto.",
+    "ROLE_ASSIGNED": "Se te asignó el rol {0}",
+    "ROLE_REVOKED": "Se te quitó el rol {0}"
   }
 }

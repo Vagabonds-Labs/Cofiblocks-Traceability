@@ -147,59 +147,58 @@
   background: rgba(var(--cb-danger), 0.16);
 }
 
-/* Scoped account controls: avoid DaisyUI button outlines outside keyboard focus. */
-.profile-page :is(.btn-primary, .btn-secondary) {
+/*
+ * DaisyUI define `.btn-*` y otros nombres iguales a los nuestros y los pisa.
+ * Dentro de `.app-page` (todas las páginas de la app) se restauran.
+ */
+.app-page :is(.btn-primary, .btn-secondary) {
   outline: none;
 }
 
-.profile-page .btn-secondary {
+.app-page .btn-secondary {
   background: rgb(var(--cb-surface) / 0.92);
   border: 1px solid rgb(var(--cb-border) / 0.95);
 }
 
-.profile-page .field-input {
+.app-page .field-input {
   border: 1px solid rgb(var(--cb-border) / 0.95);
   background: rgb(var(--cb-surface) / 0.95);
 }
 
-.profile-page .field-input:focus {
+.app-page .field-input:focus {
   border-color: rgb(var(--cb-primary) / 0.5);
   box-shadow: 0 0 0 4px rgb(var(--cb-primary) / 0.12);
 }
 
-.profile-page :is(a, button, summary):focus-visible {
-  outline: 3px solid #b88535;
-  outline-offset: 4px;
-}
-
-/* Coffee storefront: warm surfaces and visible keyboard navigation. */
-.marketplace-page .field-input {
-  border-color: #deded3;
-  background: #fff;
-  border-radius: 0.65rem;
-}
-
-.marketplace-page :is(a, button, select):focus-visible,
+.app-page :is(a, button, summary, select, input, textarea):focus-visible,
 header :is(a, button, select):focus-visible,
 footer a:focus-visible {
   outline: 3px solid #a47a35;
   outline-offset: 4px;
 }
 
-.catalog-message {
-  border: 1px solid #e3dfd5;
-  border-radius: 1rem;
-  background: white;
-  padding: 3rem 1.5rem;
-  text-align: center;
-  color: #304335;
+/* Tablas de administración: scroll horizontal en el celular, sin romper la página. */
+.data-table {
+  @apply w-full min-w-[640px] text-left text-sm;
+}
+
+.data-table th {
+  @apply border-b border-[#e3e8e4] px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[#5a6760];
+}
+
+.data-table td {
+  @apply border-b border-[#eef1ee] px-4 py-3 align-middle;
+}
+
+.data-table tbody tr:last-child td {
+  @apply border-b-0;
 }
 
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
   }
-  .marketplace-page .animate-pulse {
+  .animate-pulse {
     animation: none;
   }
 }

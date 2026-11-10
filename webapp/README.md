@@ -1,38 +1,27 @@
-# CofiBlocks Webapp
+# CofiBlocks Traceability — webapp
 
-Next.js frontend application for the CofiBlocks marketplace.
+Next.js (App Router, next-intl, Tailwind) para el personal de las cooperativas y
+de la unión. Los caficultores usan el bot de Telegram, no la web.
 
-## Setup
+## Puesta en marcha
 
-1. Install dependencies:
 ```bash
 npm install
+cp .env.example .env.local    # JWT_SECRET = JWT_ACCESS_SECRET del backend
+npm run dev                   # http://localhost:3000
 ```
 
-2. Run the development server:
-```bash
-npm run dev
-```
+En desarrollo `/api/*` se redirige al backend (`NEXT_PUBLIC_API_URL`).
 
-The application will start on `http://localhost:3000`
+## Páginas
 
-## Build
+| Ruta | Quién | Qué muestra |
+|---|---|---|
+| `/` | todos | Sin sesión: presentación del piloto. Con sesión: rol, organización, tareas y cuenta Stellar. |
+| `/login` | sin sesión | Login (Privy o wallet de Stellar, hasta integrar Cavos). |
+| `/profile` | sesión | Datos personales y acceso a la cuenta. |
+| `/admin/users` | admin | Usuarios y asignación de roles (on-chain). |
+| `/admin/farmers` | admin | Importación de la lista de caficultores y su estado en el bot. |
 
-To build for production:
-```bash
-npm run build
-npm start
-```
-
-## Features
-
-- **Landing Page**: Marketplace with product grid
-- **Search**: Search products by name or region
-- **Filters**: Filter by region, roast level, price range, and grind type
-- **Responsive Design**: Mobile-first responsive layout with TailwindCSS
-- **TypeScript**: Full type safety throughout the application
-
-## API Integration
-
-The frontend connects to the server API at `http://localhost:4000/api/products`. Make sure the server is running before starting the frontend
-
+Idiomas: inglés y español (`locales/`). Afaan oromoo y amárico se suman cuando
+el equipo local entregue las traducciones.

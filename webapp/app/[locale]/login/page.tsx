@@ -1,9 +1,9 @@
 'use client'
 
-import { useRouter, useSearchParams, useParams } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslations } from 'next-intl'
-import { BanknotesIcon, HeartIcon, ShieldCheckIcon } from '@heroicons/react/24/outline'
+import { CheckBadgeIcon, LockClosedIcon, ShieldCheckIcon } from '@heroicons/react/24/outline'
 
 import { LoginMethods } from '@/components/auth/LoginMethods'
 import { useWalletLogin } from '@/hooks'
@@ -12,7 +12,6 @@ import { isPrivyEnabled } from '@/services/wallet/privySigner'
 export default function LoginPage() {
   const t = useTranslations()
   const router = useRouter()
-  const searchParams = useSearchParams()
   const { locale } = useParams()
 
   const wallet = useWalletLogin()
@@ -20,31 +19,20 @@ export default function LoginPage() {
   const onEmailLoggedIn = useCallback(() => setEmailLoggedIn(true), [])
   const privy = isPrivyEnabled()
 
-  // redirect intent
-  const redirect = searchParams.get('redirect')
-
-  // --- AUTH OBSERVER ---
+  // Una vez dentro, a la página de inicio, que muestra lo que corresponde al rol.
   useEffect(() => {
     if (!((wallet.address && wallet.isRegistered) || emailLoggedIn)) return
-
-    // cleanup stale checkout flags when it's NOT a checkout redirect
-    if (redirect !== 'checkout') {
-      sessionStorage.removeItem('pendingCheckout')
-      sessionStorage.removeItem('checkoutRedirect')
-    }
-
-    // Redirect to home
     router.push(`/${locale}`)
-  }, [wallet.address, wallet.isRegistered, emailLoggedIn, redirect, router, locale])
+  }, [wallet.address, wallet.isRegistered, emailLoggedIn, router, locale])
 
   const points = [
     { icon: ShieldCheckIcon, text: t('auth.brand_point_1') },
-    { icon: BanknotesIcon, text: t('auth.brand_point_2') },
-    { icon: HeartIcon, text: t('auth.brand_point_3') },
+    { icon: CheckBadgeIcon, text: t('auth.brand_point_2') },
+    { icon: LockClosedIcon, text: t('auth.brand_point_3') },
   ]
 
   return (
-    <main className="app-container flex min-h-[calc(100vh-160px)] items-center py-8 md:py-12">
+    <main className="app-page app-container flex min-h-[calc(100vh-160px)] items-center py-8 md:py-12">
       <div className="mx-auto grid w-full max-w-5xl overflow-hidden rounded-3xl border border-white/70 bg-white shadow-[0_20px_60px_rgba(22,40,30,0.12)] lg:grid-cols-2">
         {/* Panel de marca: sólo en pantallas grandes. En el celular sobra. */}
         <section className="relative hidden flex-col justify-between overflow-hidden bg-[linear-gradient(150deg,rgb(40,107,86)_0%,rgb(25,82,64)_60%,rgb(18,58,46)_100%)] p-10 text-white lg:flex">
@@ -53,7 +41,7 @@ export default function LoginPage() {
 
           <div className="relative flex items-center gap-3">
             <img src="/images/logo.png" alt="CofiBlocks" className="h-10 w-10 rounded-xl bg-white/90 p-1" />
-            <span className="text-lg font-semibold">CofiBlocks</span>
+            <span className="text-lg font-semibold">CofiBlocks Traceability</span>
           </div>
 
           <div className="relative">

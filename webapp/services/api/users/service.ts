@@ -16,7 +16,8 @@ export class UserService {
   async getAllUsers(filters: GetAllUsersFilters = {}): Promise<GetAllUsersResponse> {
     // Build query string from filters
     const queryString = toQueryString({
-      seller_type: filters.sellerType,
+      role: filters.role,
+      organization_id: filters.organizationId,
       is_admin: filters.isAdmin,
       email: filters.email,
       name: filters.name,
@@ -27,21 +28,6 @@ export class UserService {
     });
     
     const response = await api.get<{data: GetAllUsersResponse}>(`/users${queryString}`);
-    return response.data;
-  }
-
-  /**
-   * Update user seller type (admin only)
-   * @param userId - User ID
-   * @param sellerType - New seller type (PRODUCER, ROASTER, or null for buyer only)
-   */
-  async updateSellerType(
-    userId: string, sellerType: 'PRODUCER' | 'ROASTER' | null): Promise<{ user: User, tx_hash: string | null }> 
-  {
-    const response = await api.patch<{ data: { user: User, tx_hash: string | null } }>(
-      `/users/${userId}/seller-type`,
-      { sellerType }
-    );
     return response.data;
   }
 

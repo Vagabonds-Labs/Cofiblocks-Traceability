@@ -10,12 +10,11 @@ const intlMiddleware = createIntlMiddleware({
   localeDetection: false
 })
 
-const authenticatedRoutes = ['/profile', '/checkout', '/my-orders']
+const authenticatedRoutes = ['/profile']
 const notAuthenticatedRoutes = ['/login']
 
 const enum RouteType {
   ADMIN = 'admin',
-  SELLER = 'seller',
   AUTHENTICATED = 'authenticated',
   NOT_AUTHENTICATED = 'not_authenticated',
   PUBLIC = 'public',
@@ -24,7 +23,7 @@ const enum RouteType {
 const localePrefixPattern = new RegExp(`^/(${locales.join('|')})(?=/|$)`)
 
 /**
- * Prefijo de idioma de la ruta (`/es`, `/pt`) o vacío para el idioma por defecto.
+ * Prefijo de idioma de la ruta (`/es`) o vacío para el idioma por defecto.
  *
  * Hay que sacarlo antes de clasificar la ruta: con `localePrefix: 'as-needed'`
  * la misma página vive en `/profile` y en `/es/profile`, y comparar la ruta
@@ -36,8 +35,6 @@ const routeType = (pathname: string) => {
   const path = pathname.slice(localePrefixOf(pathname).length) || '/'
   if (path.startsWith('/admin')) {
     return RouteType.ADMIN
-  } else if (path.startsWith('/seller')) {
-    return RouteType.SELLER
   } else if (authenticatedRoutes.includes(path)) {
     return RouteType.AUTHENTICATED
   } else if (notAuthenticatedRoutes.includes(path)) {
@@ -87,12 +84,8 @@ export async function middleware(req: NextRequest) {
       return intlMiddleware(req)
     }
 
-    const isSeller = payload.is_producer || payload.is_roaster
-
     if (route_type === RouteType.ADMIN && !payload.is_admin) {
-      return redirectTo(req, '/403')
-    } else if (route_type === RouteType.SELLER && !isSeller) {
-      return redirectTo(req, '/403')
+      return redirectTo(req, '/')
     }
 
     // 3️⃣ Si todo está bien → intl

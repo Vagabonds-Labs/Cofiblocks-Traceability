@@ -1,24 +1,47 @@
-# Contratos de CofiBlocks (Soroban)
+# Contrato de trazabilidad (Soroban)
 
-Dos contratos en Rust sobre Stellar/Soroban:
+Un contrato en Rust sobre Stellar/Soroban, `traceability`, que registra:
 
-| Contrato | Qué hace |
+- **Roles** del personal del piloto, cada uno dentro de una organización (una
+  cooperativa o la unión).
+- **Caficultores**: el vínculo entre su wallet y el ID seudónimo que les asigna la
+  cooperativa, más el hash del consentimiento EUDR que firman ellos mismos.
+- **Lotes** y su recorrido por las etapas, con quién hizo cada cambio, cuándo y el
+  hash del registro completo de esa etapa.
+
+En la cadena **no va ningún dato personal**: nombres, teléfonos, GPS, fotos y
+documentos viven off-chain. Cada registro off-chain se resume en un SHA-256
+(`data_hash`, `consent_hash`); recalcularlo y compararlo prueba que no se alteró.
+
+## Roles y etapas
+
+| Etapa | Quién la marca |
 |---|---|
-| `marketplace` | Roles, productos, stock, compra en lote, saldos de vendedor y claims del reparto. |
-| `distribution` | Registra las compras y reparte las utilidades de a páginas. |
+| `Received` (`create_batch`) | `Collector` |
+| `Washing`, `Fermentation`, `Drying` | `IndustryManager` |
+| `Storage` | `IndustryManager` o `StoreKeeper` |
+| `InTransportToUnion` | `StoreKeeper` |
+| `PreparedWithExportableBag`, `Sold` | `ExportManager` |
 
-`interfaces` es un crate compartido con los tipos y el cliente que el marketplace
-usa para invocar a `distribution`, sin arrastrar su implementación al WASM.
+- Las etapas avanzan de a una. La única que se puede saltear es `Fermentation`
+  (Washing → Drying), hasta que Etiopía confirme si es una etapa propia.
+- El personal de una cooperativa sólo mueve lotes de su cooperativa. El Export
+  Manager trabaja a nivel de unión y mueve lotes de cualquiera.
+- `CommitteeMember` no mueve lotes: carga precios diarios, que van off-chain.
+- Cada cuenta tiene un solo rol. Los asigna el admin (el backend).
 
-## Lo que ya no existe
+## Funciones
 
-La versión Starknet tenía cuatro contratos. Se cayeron dos:
-
-- **`cofi_collection` (ERC-1155).** Soroban no tiene equivalente multi-token y se
-  decidió no escribirlo. El stock vive en `ListedProduct` dentro del marketplace;
-  el NFT era una representación paralela. Con él se van el base URI, el metadata
-  IPFS, `TOKEN_METADATA_URL` y el paso post-deploy `set_minter`.
-- **`swap` (Ekubo).** Sólo se paga en USDC.
+| Función | Firma | Qué hace |
+|---|---|---|
+| `grant_role(account, role, org)` | admin | Asigna un rol de personal. |
+| `revoke_role(account)` | admin | Quita el rol; si era caficultor, libera su `farmer_ref`. |
+| `register_farmer(account, farmer_ref, coop)` | admin | Vincula la wallet del caficultor con su ID de cooperativa. |
+| `record_consent(farmer, consent_hash)` | caficultor | Registra el consentimiento EUDR firmado. |
+| `create_batch(actor, id, farmer_ref, collection_center, weight_grams, data_hash)` | collector | Crea el lote en `Received`. |
+| `advance_stage(actor, id, stage, data_hash)` | rol de la etapa | Lleva el lote a la etapa siguiente. |
+| `get_member`, `get_farmer`, `get_farmer_by_ref`, `get_batch`, `get_admin` | — | Lecturas. |
+| `set_admin`, `upgrade` | admin | Administración. |
 
 ## Requisitos
 
@@ -33,69 +56,22 @@ rustup target add wasm32v1-none
 cargo test --workspace
 ```
 
-`Env::default()` enforcea los límites de recursos de mainnet, así que la suite
-falla si un contrato se vuelve demasiado pesado para la red.
-
 ## Build
 
 ```bash
 stellar contract build
 ```
 
-Deja los WASM en `target/wasm32v1-none/release/`.
+Deja el WASM en `target/wasm32v1-none/release/traceability.wasm`.
 
 ## Despliegue
 
-Primero, el entorno de testnet — identidades, fondeo, trustlines y un USDC de
-prueba con los mismos 7 decimales que el real:
-
 ```bash
-../scripts/setup-testnet.sh
-```
-
-Después:
-
-```bash
+../scripts/setup-testnet.sh        # identidad admin fondeada
 ./scripts/deploy.sh testnet
-./scripts/deploy.sh mainnet
 ```
 
-El script compila, sube y despliega los dos contratos, enlaza `distribution` con
-el marketplace (`set_marketplace`) y escribe `deployments/<network>.json` con el
-mismo formato que consume `getContractAddress()` en el backend.
-
-Variables opcionales: `STELLAR_ADMIN_IDENTITY` (por defecto `cofi-admin`),
-`MARKET_FEE_BPS` (por defecto `5000`, o sea 50 %), `USDC_ISSUER`.
-
-En **mainnet** se usa el USDC de Circle
-(`GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN`), verificado en
-7 decimales. En **testnet** se usa un activo propio: el de Circle no lo podemos
-emitir.
-
-## Recorrido punta a punta
-
-```bash
-./scripts/e2e-testnet.sh
-```
-
-Rol → publicar → comprar → cobrar → repartir → reclamar, todo on-chain y con los
-saldos verificados. Es el criterio de aceptación del despliegue.
-
-## Notas de diseño
-
-- **Una sola invocación por transacción.** Stellar admite un único
-  `InvokeHostFunction` por transacción, así que el multicall del checkout
-  (`approve` + N × `buy_product` + `transfer` del envío) se colapsó en
-  `buy_products(buyer, token_ids, amounts, delivery_fee)`.
-- **Sin `approve`.** La autorización viaja por el árbol de invocación: el
-  marketplace hace `usdc.transfer(&buyer, …)` y el `require_auth()` del comprador
-  queda cubierto por la firma de la transacción.
-- **`i128` y 7 decimales.** USDC en Stellar es un activo clásico. Se fue el par
-  `low`/`high` de `u256`.
-- **Eventos legibles.** Topics con símbolos y datos indexados por nombre de
-  campo (`#[contractevent]`), en vez de selectores hexadecimales.
-- **Reparto paginado.** `distribute(cursor, limit)` congela un *epoch* al
-  arrancar: las compras que entran durante el reparto se acumulan en el epoch
-  siguiente y no interfieren.
-- **TTL.** Toda escritura extiende el TTL de la entrada. `touch_product` permite
-  al panel admin evitar que un producto inactivo se archive.
+El script compila, sube y despliega el contrato con la identidad
+`STELLAR_ADMIN_IDENTITY` (por defecto `cofi-admin`) como admin, y escribe
+`deployments/<network>.json`. La clave secreta de esa identidad es la que va en
+`STELLAR_ADMIN_SECRET` del backend.

@@ -4,7 +4,6 @@ import { authenticate, requireAdmin, validate } from '@/middleware';
 import {
   updateUserSchema,
   getAllUsersSchema,
-  updateSellerTypeSchema,
   updateAdminStatusSchema,
   deleteUserSchema,
   type GetAllUsersQuery,
@@ -19,7 +18,8 @@ router.get('/', authenticate, requireAdmin, validate(getAllUsersSchema), async (
   const query = req.query as unknown as GetAllUsersQuery;
 
   const result = await UsersService.getAllUsers({
-    sellerType: query.seller_type,
+    role: query.role,
+    organizationId: query.organization_id,
     isAdmin: query.is_admin,
     email: query.email,
     name: query.name,
@@ -45,22 +45,6 @@ router.patch('/', authenticate, validate(updateUserSchema), async (req: Request,
   const updatedUser = await UsersService.updateUser(userId, { name, email });
 
   successResponse(res, {user: updatedUser}, 'User updated successfully', 200);
-});
-
-
-router.patch(
-  '/:userId/seller-type', 
-  authenticate,
-  requireAdmin, 
-  validate(updateSellerTypeSchema), 
-  async (req: Request, res: Response, next) => 
-{
-  const { userId } = req.params;
-  const sellerType = req.body.sellerType;
-
-  const { user: updatedUser, tx_hash } = await UsersService.updateUserSellerType(userId, sellerType);
-
-  successResponse(res, {user: updatedUser, tx_hash: tx_hash}, 'Seller type updated successfully', 200);
 });
 
 

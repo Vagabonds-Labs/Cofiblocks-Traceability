@@ -34,7 +34,7 @@ export const getNotificationsSchema = z.object({
         .refine(Number.isInteger)
         .refine((val) => val >= 0),
 
-      lang: z.enum(['en', 'es', 'pt']).optional().default('en'),
+      lang: z.enum(['en', 'es']).optional().default('en'),
     })
     .default({ limit: 20, offset: 0, lang: 'en' }),
 });

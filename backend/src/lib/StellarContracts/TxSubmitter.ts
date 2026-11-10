@@ -16,8 +16,8 @@ const POLL_TIMEOUT_MS = 45_000;
  * Recibe la transacción firmada por el usuario, la envuelve en un fee-bump y la
  * manda a la red.
  *
- * El fee-bump es lo que reemplaza a Cavos: el backend paga el fee con su propia
- * cuenta, así el comprador nunca necesita tener XLM. También es de acá de donde
+ * El backend paga el fee con su propia cuenta, así ningún usuario necesita
+ * tener XLM. También es de acá de donde
  * sale el hash — más confiable que confiar en el que reporte el cliente.
  */
 export class TxSubmitter {
@@ -100,7 +100,7 @@ export class TxSubmitter {
     }
   }
 
-  /** Envía una transacción que ya firmó el backend (roles, reparto). */
+  /** Envía una transacción que ya firmó el backend (roles, caficultores). */
   public async submitAsService(tx: Transaction): Promise<SubmittedTransaction> {
     return this.send(tx.toXDR());
   }

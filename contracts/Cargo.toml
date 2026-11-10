@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["interfaces", "marketplace", "distribution"]
+members = ["traceability"]
 
 [workspace.package]
 version = "0.1.0"
@@ -9,7 +9,6 @@ license = "MIT"
 
 [workspace.dependencies]
 soroban-sdk = "27.0.6"
-cofiblocks-interfaces = { path = "interfaces" }
 
 [profile.release]
 opt-level = "z"

@@ -43,8 +43,8 @@ export async function refreshAccessToken(refreshToken: string): Promise<{ access
     const accessToken = jwtService.generateAccessToken({
       userId: tokenRecord.userId,
       is_admin: tokenRecord.user.isAdmin,
-      is_producer: tokenRecord.user.sellerType === 'PRODUCER',
-      is_roaster: tokenRecord.user.sellerType === 'ROASTER',
+      role: tokenRecord.user.role,
+      organization_id: tokenRecord.user.organizationId,
       walletAddress: tokenRecord.user.walletAddress || '',
     });
 
@@ -73,8 +73,8 @@ export async function createSession(
   const tokens = jwtService.generateTokenPair({
     userId: user.id,
     is_admin: user.isAdmin,
-    is_producer: user.sellerType === 'PRODUCER',
-    is_roaster: user.sellerType === 'ROASTER',
+    role: user.role,
+    organization_id: user.organizationId,
     walletAddress: user.walletAddress || '',
     sessionId: session.id,
   });

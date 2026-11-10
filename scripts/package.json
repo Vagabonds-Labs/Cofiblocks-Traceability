@@ -1,13 +1,8 @@
 {
-  "name": "cofiblocks-stellar-scripts",
+  "name": "cofiblocks-traceability-scripts",
   "private": true,
-  "type": "module",
-  "description": "Herramientas de entorno para la migración a Stellar",
+  "description": "Herramientas de entorno de Stellar",
   "scripts": {
-    "verify:constants": "node verify-stellar-constants.mjs",
     "setup:testnet": "./setup-testnet.sh"
-  },
-  "dependencies": {
-    "@stellar/stellar-sdk": "^17.0.1"
   }
 }

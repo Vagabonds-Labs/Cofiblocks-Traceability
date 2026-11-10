@@ -2,24 +2,20 @@ import cors from 'cors';
 import 'dotenv/config';
 import 'express-async-errors';
 import cookieParser from 'cookie-parser';
-import express, { Request, Response } from 'express';
+import express from 'express';
 
-import productsRoute from './routes/products';
 import healthRoute from './routes/health';
 import usersRoute from './routes/users';
 import notificationsRoute from './routes/notifications';
-import onchainRoute from './routes/onchain';
-import farmsRoute from './routes/farms';
-import ordersRoute from './routes/orders';
 import authRoute from './routes/auth';
-import eventsRoute from './routes/events';
-import sellsRoute from './routes/sells';
 import adminRoute from './routes/admin';
 import configRoute from './routes/config';
+import organizationsRoute from './routes/organizations';
+import { startTelegramBot } from './bot';
 import { errorHandlerMiddleware } from './middleware/errorHandler';
 import { requestId } from './middleware/requestId';
 import { withLogger } from './middleware/logger';
-import { startOrderExpirationJob } from './jobs/OrderExpirationJob';
+import { logger } from './lib/logger';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -28,10 +24,10 @@ const PORT = process.env.PORT || 4000;
 app.use(requestId);
 app.use(withLogger);
 
+// Orígenes del frontend. `FRONTEND_URL` suma el de cada entorno (staging).
 const allowedOrigins = [
   "http://localhost:3000",
-  "https://app.cofiblocks.com",
-  "https://app-test.cofiblocks.com",
+  ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : []),
 ];
 
 function isAllowedPreviewOrigin(origin: string) {
@@ -84,22 +80,26 @@ app.use((req, res, next) => {
 
 // APIs
 app.use("/api/health", healthRoute);
-app.use("/api/products", productsRoute);
 app.use("/api/users", usersRoute);
 app.use("/api/notifications", notificationsRoute);
-app.use("/api/onchain", onchainRoute);
-app.use("/api/farms", farmsRoute);
-app.use("/api/orders", ordersRoute);
 app.use("/api/auth", authRoute);
-app.use("/api/events", eventsRoute);
-app.use("/api/sells", sellsRoute);
 app.use("/api/admin", adminRoute);
 app.use("/api/config", configRoute);
+app.use("/api/organizations", organizationsRoute);
 
-// Error handling middleware (must be last)
-app.use(errorHandlerMiddleware);
+async function main() {
+  // El webhook del bot se registra antes del manejador de errores.
+  await startTelegramBot(app);
 
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
-  startOrderExpirationJob();
+  // Error handling middleware (must be last)
+  app.use(errorHandlerMiddleware);
+
+  app.listen(PORT, () => {
+    console.log(`🚀 Server running on http://localhost:${PORT}`);
+  });
+}
+
+main().catch((error) => {
+  logger.fatal({ error }, 'Server failed to start');
+  process.exit(1);
 });

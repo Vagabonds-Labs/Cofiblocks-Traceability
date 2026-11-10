@@ -110,6 +110,9 @@ async function parseError(response: Response): Promise<ApiError> {
     statusCode: response.status,
     message: data.message || "Unexpected error",
     code: data.code,
+    // Algunas respuestas de error traen detalle (p. ej. los errores por línea
+    // de la importación de caficultores).
+    data: data.data,
   };
 }
 
