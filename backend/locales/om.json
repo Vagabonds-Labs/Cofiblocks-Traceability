@@ -1,0 +1,7 @@
+{
+  "notifications": {
+    "welcome_message": "Baga gara CofiBlocks Traceability dhuftan! Bulchaan tokko gahee keessan pirojektii yaalii keessatti isiniif ramada.",
+    "ROLE_ASSIGNED": "Gaheen {0} isiniif kennameera",
+    "ROLE_REVOKED": "Gaheen {0} keessan isin irraa kaafameera"
+  }
+}

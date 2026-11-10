@@ -1,8 +1,9 @@
 import { getRequestConfig } from 'next-intl/server';
 import { cookies } from 'next/headers';
 
-export type Locale = 'en' | 'es';
-export const locales: Locale[] = ['en', 'es'];
+// Afaan Oromoo (om) y amárico (am) son los idiomas del piloto en Etiopía.
+export type Locale = 'en' | 'es' | 'om' | 'am';
+export const locales: Locale[] = ['en', 'es', 'om', 'am'];
 
 export const defaultLocale = 'en' as const;
 

@@ -4,7 +4,8 @@
 
 @layer base {
   :root {
-    --font-manrope: 'Manrope';
+    /* Manrope no tiene la escritura etíope: el amárico cae en Noto Sans Ethiopic. */
+    --font-manrope: 'Manrope', 'Noto Sans Ethiopic';
     --cb-bg-start: 246 244 240;
     --cb-bg-mid: 241 246 243;
     --cb-bg-end: 233 241 236;

@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { LOCALES } from '@/types/locale';
+
 /**
  * Create notification schema
  */
@@ -34,7 +36,7 @@ export const getNotificationsSchema = z.object({
         .refine(Number.isInteger)
         .refine((val) => val >= 0),
 
-      lang: z.enum(['en', 'es']).optional().default('en'),
+      lang: z.enum(LOCALES).optional().default('en'),
     })
     .default({ limit: 20, offset: 0, lang: 'en' }),
 });

@@ -1,9 +1,11 @@
 import es from '../../locales/es.json';
 import en from '../../locales/en.json';
+import om from '../../locales/om.json';
+import am from '../../locales/am.json';
 
-import { Locale } from '@/types/locale';
+import { Locale, LOCALES as SUPPORTED_LOCALES } from '@/types/locale';
 
-const LOCALES = { es, en };
+const LOCALES: Record<Locale, typeof en> = { es, en, om, am };
 
 /**
  * Get translation value using dot notation
@@ -38,7 +40,7 @@ function formatString(template: string, args: string[]): string {
 /**
  * Get notification message from locale file
  * @param key - The notification key (e.g., "welcome_message")
- * @param lang - The language code (en, es)
+ * @param lang - The language code (en, es, om, am)
  * @param args - Optional arguments to format the message
  * @returns The formatted notification message
  */
@@ -62,5 +64,5 @@ export function getNotificationMessage(
  * Validate if a language code is supported
  */
 export function isValidLocale(lang: string): lang is Locale {
-    return ['en', 'es'].includes(lang);
+    return (SUPPORTED_LOCALES as readonly string[]).includes(lang);
   }

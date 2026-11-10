@@ -4,7 +4,7 @@ import { logger } from '@/lib/logger';
 import * as FarmersService from '@/services/app/FarmersService';
 import * as OrganizationsService from '@/services/app/OrganizationsService';
 import { Conversation, getConversation, saveConversation } from './conversation';
-import { BOT_LANGUAGES, t } from './messages';
+import { BOT_LANGUAGES, chooseLanguagePrompt, t } from './messages';
 
 /** Después de tantos IDs inválidos seguidos, el bot deriva a la cooperativa. */
 const MAX_FAILED_ATTEMPTS = 5;
@@ -23,7 +23,7 @@ function languageKeyboard(): InlineKeyboard {
 
 async function askLanguage(ctx: Context, chatId: bigint) {
   await saveConversation(chatId, { step: 'CHOOSE_LANGUAGE', data: {} });
-  await ctx.reply(t('en', 'chooseLanguage'), { reply_markup: languageKeyboard() });
+  await ctx.reply(chooseLanguagePrompt(), { reply_markup: languageKeyboard() });
 }
 
 async function askCooperative(ctx: Context, chatId: bigint, language: string | null) {

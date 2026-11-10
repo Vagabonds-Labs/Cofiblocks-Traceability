@@ -1,0 +1,7 @@
+{
+  "notifications": {
+    "welcome_message": "እንኳን ወደ CofiBlocks Traceability በደህና መጡ! አንድ አስተዳዳሪ በሙከራ ፕሮጀክቱ ውስጥ ሚናዎን ይመድብልዎታል።",
+    "ROLE_ASSIGNED": "የ{0} ሚና ተሰጥቶዎታል",
+    "ROLE_REVOKED": "የ{0} ሚናዎ ተነስቷል"
+  }
+}

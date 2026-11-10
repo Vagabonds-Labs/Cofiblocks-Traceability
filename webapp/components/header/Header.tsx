@@ -10,8 +10,10 @@ import { UserMenu } from '../menu'
 import { NotificationDropdown } from '../notifications'
 
 const LANGUAGES = [
-  { code: 'en', label: 'EN' },
-  { code: 'es', label: 'ES' },
+  { code: 'en', label: 'EN', name: 'English' },
+  { code: 'es', label: 'ES', name: 'Español' },
+  { code: 'om', label: 'OM', name: 'Afaan Oromoo' },
+  { code: 'am', label: 'AM', name: 'አማርኛ' },
 ] as const
 
 const isSupported = (value: string | null): value is (typeof LANGUAGES)[number]['code'] =>
@@ -93,7 +95,7 @@ export function Header() {
                 aria-label={t('header.language_selector')}
               >
                 {LANGUAGES.map((lang) => (
-                  <option key={lang.code} value={lang.code}>
+                  <option key={lang.code} value={lang.code} title={lang.name} lang={lang.code}>
                     {lang.label}
                   </option>
                 ))}

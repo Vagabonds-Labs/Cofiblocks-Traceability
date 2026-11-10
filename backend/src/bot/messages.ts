@@ -1,9 +1,8 @@
 /**
- * Textos del bot.
+ * Textos del bot en inglés, Afaan Oromoo y amárico.
  *
- * Por ahora sólo hay inglés. Afaan Oromoo y amárico se ofrecen en el selector
- * de idioma, pero caen en inglés hasta que el equipo local entregue las
- * traducciones: basta con agregar sus objetos acá con las mismas claves.
+ * Las traducciones a oromo y amárico son un primer borrador: el equipo local
+ * tiene que revisarlas antes del piloto. Si falta una clave, cae en inglés.
  */
 export const BOT_LANGUAGES = [
   { code: 'en', label: 'English' },
@@ -40,7 +39,62 @@ const en = {
 
 export type MessageKey = keyof typeof en;
 
-const MESSAGES: Partial<Record<BotLanguage, Partial<Record<MessageKey, string>>>> = { en };
+const om: Record<MessageKey, string> = {
+  chooseLanguage: 'Baga gara CofiBlocks dhuftan ☕\nMaaloo afaan keessan filadhaa.',
+  chooseCoop: 'Buna keessan waldaa hojii gamtaa kamiif dhiyeessitu?',
+  enterId: 'Maaloo ID qonnaan bulaa {coop} isiniif kenne barreessaa.',
+  linked:
+    'Akkam! Qonnaan bulaa {coop} ta\'uun ID {id}n galmooftaniittu. ✅\n\n' +
+    'Yeroo dhihootti piroofaayilii keessan guutuu, lafa qonnaa keessan dabaluu fi buna keessan asii hordofuu ni dandeessu.',
+  welcomeBack: 'Baga deebitan, qonnaan bulaa {id} kan {coop}! ☕',
+  notFound:
+    'ID {id} {coop} keessatti hin arganne. Maaloo ilaalaatii irra deebi\'aa barreessaa, ' +
+    'ykn waldaa hojii gamtaa biraa filachuuf /start ergaa.',
+  tooManyAttempts:
+    'Yaalii hedduu booda ID keessan mirkaneessuu hin dandeenye. Maaloo akka isin gargaaraniif waldaa hojii gamtaa keessan quunnamaa.',
+  linkedToOtherAccount:
+    'ID {id} duraan herrega Telegram biraa wajjin walqabateera. Maaloo waldaa hojii gamtaa keessan quunnamaa.',
+  telegramAlreadyRegistered:
+    'Herregni Telegram kun duraan qonnaan bulaa biraatiin galmaa\'eera. Maaloo waldaa hojii gamtaa keessan quunnamaa.',
+  useButtons: 'Maaloo qabduuwwan armaan olii fayyadamaa, ykn haaraatti jalqabuuf /start ergaa.',
+  help:
+    'CofiBlocks buna keessan giddu-gala walitti qabaa irraa hanga gurgurtaatti akka hordoftan isin gargaara.\n\n' +
+    '/start – jalqabi ykn galmee kee ilaali\n/language – afaan jijjiiri\n/help – ergaa kana',
+  noCoops: 'Galmeen ammallee hin banamne. Maaloo booda irra deebi\'aa yaalaa.',
+  error: 'Nu biratti rakkoon uumameera. Maaloo daqiiqaa muraasa booda irra deebi\'aa yaalaa.',
+};
+
+const am: Record<MessageKey, string> = {
+  chooseLanguage: 'እንኳን ወደ CofiBlocks በደህና መጡ ☕\nእባክዎ ቋንቋዎን ይምረጡ።',
+  chooseCoop: 'ቡናዎን ለየትኛው ኅብረት ሥራ ማኅበር ያስረክባሉ?',
+  enterId: 'እባክዎ {coop} የሰጠዎትን የአርሶ አደር መለያ ቁጥር ይጻፉ።',
+  linked:
+    'ሰላም! በ{id} መለያ ቁጥር የ{coop} አርሶ አደር ሆነው ተመዝግበዋል። ✅\n\n' +
+    'በቅርቡ መገለጫዎን ማሟላት፣ ማሳዎችዎን መጨመር እና ቡናዎን ከዚህ መከታተል ይችላሉ።',
+  welcomeBack: 'እንኳን ደህና መጡ፣ የ{coop} አርሶ አደር {id}! ☕',
+  notFound:
+    'መለያ ቁጥር {id}ን በ{coop} ውስጥ ማግኘት አልቻልንም። እባክዎ አረጋግጠው እንደገና ይጻፉ፣ ' +
+    'ወይም ሌላ ማኅበር ለመምረጥ /start ይላኩ።',
+  tooManyAttempts: 'ከበርካታ ሙከራዎች በኋላ መለያ ቁጥርዎን ማረጋገጥ አልቻልንም። እንዲረዱዎት እባክዎ ማኅበርዎን ያነጋግሩ።',
+  linkedToOtherAccount: 'መለያ ቁጥር {id} ቀድሞ ከሌላ የTelegram መለያ ጋር ተገናኝቷል። እባክዎ ማኅበርዎን ያነጋግሩ።',
+  telegramAlreadyRegistered: 'ይህ የTelegram መለያ ቀድሞ እንደ ሌላ አርሶ አደር ተመዝግቧል። እባክዎ ማኅበርዎን ያነጋግሩ።',
+  useButtons: 'እባክዎ ከላይ ያሉትን ቁልፎች ይጠቀሙ፣ ወይም እንደገና ለመጀመር /start ይላኩ።',
+  help:
+    'CofiBlocks ቡናዎን ከመሰብሰቢያ ማዕከል እስከ ሽያጭ እንዲከታተሉ ይረዳዎታል።\n\n' +
+    '/start – ይጀምሩ ወይም ምዝገባዎን ይመልከቱ\n/language – ቋንቋ ይቀይሩ\n/help – ይህ መልዕክት',
+  noCoops: 'ምዝገባው ገና አልተከፈተም። እባክዎ ቆይተው እንደገና ይሞክሩ።',
+  error: 'በእኛ በኩል ችግር ተፈጥሯል። እባክዎ ከጥቂት ደቂቃዎች በኋላ እንደገና ይሞክሩ።',
+};
+
+const MESSAGES: Partial<Record<BotLanguage, Partial<Record<MessageKey, string>>>> = { en, om, am };
+
+/**
+ * Pregunta por el idioma en los tres idiomas: todavía no sabemos cuál lee el
+ * caficultor.
+ */
+export function chooseLanguagePrompt(): string {
+  return BOT_LANGUAGES.map((language) => t(language.code, 'chooseLanguage')).join('\n\n');
+}
 
 export function t(language: string | null | undefined, key: MessageKey, vars: Record<string, string> = {}): string {
   const table = MESSAGES[(language ?? 'en') as BotLanguage] ?? {};
