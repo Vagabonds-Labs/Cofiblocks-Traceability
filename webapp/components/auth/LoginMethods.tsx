@@ -5,19 +5,19 @@ import { useTranslations } from 'next-intl'
 import { WalletIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline'
 
 import { LoginMethodsProps } from './types'
-import { PrivyLoginPanel } from './PrivyLoginPanel'
+import { CavosLoginPanel } from './CavosLoginPanel'
 import { isMobile } from '../../utils/platform'
-import { isPrivyEnabled } from '@/services/wallet/privySigner'
+import { isCavosEnabled } from '@/lib/auth/cavos'
 
 /**
  * Formas de entrar.
  *
  * La app es para gente que no viene de web3, así que lo principal es entrar con
- * correo, teléfono, Google, Apple o X (Privy). Conectar una wallet de
- * Stellar sigue disponible, pero como un link discreto al final: el modal lo
- * abre el Stellar Wallets Kit (Freighter, xBull, Albedo, Lobstr y Rabet).
+ * Telegram o email (Cavos). Conectar una wallet de Stellar sigue disponible,
+ * como un link discreto al final: el modal lo abre el Stellar Wallets Kit
+ * (Freighter, xBull, Albedo, Lobstr y Rabet).
  *
- * Sin `NEXT_PUBLIC_PRIVY_APP_ID` la wallet es la única opción y vuelve a ser el
+ * Sin `NEXT_PUBLIC_CAVOS_APP_ID` la wallet es la única opción y vuelve a ser el
  * botón principal.
  */
 export function LoginMethods({
@@ -28,7 +28,7 @@ export function LoginMethods({
 }: LoginMethodsProps) {
   const t = useTranslations()
   const [showMobileWalletWarning, setShowMobileWalletWarning] = useState(false)
-  const privy = isPrivyEnabled()
+  const cavos = isCavosEnabled()
 
   const handleWalletClick = () => {
     if (isMobile()) {
@@ -45,7 +45,7 @@ export function LoginMethods({
 
   return (
     <div className="space-y-6">
-      {privy && <PrivyLoginPanel onLoggedIn={onEmailLoggedIn} />}
+      {cavos && <CavosLoginPanel onLoggedIn={onEmailLoggedIn} />}
 
       {walletError && (
         <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
@@ -53,7 +53,7 @@ export function LoginMethods({
         </div>
       )}
 
-      {privy ? (
+      {cavos ? (
         <div className="border-t border-gray-100 pt-5 text-center text-sm text-[rgb(var(--cb-muted))]">
           {t('auth.wallet_prompt')}{' '}
           <button

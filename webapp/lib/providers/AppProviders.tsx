@@ -1,46 +1,28 @@
 'use client'
 
 import { ReactNode } from 'react'
-import { PrivyProvider } from '@privy-io/react-auth'
+import { CavosProvider } from '@cavos/kit/react'
 
 import { UserProvider } from './UserProvider'
-import { PrivyBridge } from '@/components/auth/PrivyBridge'
-import { PRIVY_LOGIN_METHODS } from '@/lib/auth/loginMethods'
-
-const PRIVY_APP_ID = process.env.NEXT_PUBLIC_PRIVY_APP_ID
+import { CavosBridge } from '@/components/auth/CavosBridge'
+import { cavosConfig, cavosModalConfig, isCavosEnabled } from '@/lib/auth/cavos'
 
 /**
  * Proveedores de la app.
  *
- * Hay dos formas de entrar: con una wallet de Stellar (Stellar Wallets Kit, que
- * no necesita provider) o con email o Google, a través de Privy, que le crea al
- * usuario una wallet embebida. Sin `NEXT_PUBLIC_PRIVY_APP_ID` queda sólo la
- * primera.
+ * Hay dos formas de entrar: con Telegram o email, a través de Cavos, que le
+ * crea al usuario una wallet de Stellar sin frases semilla; o con una wallet de
+ * Stellar propia (Stellar Wallets Kit, que no necesita provider). Sin
+ * `NEXT_PUBLIC_CAVOS_APP_ID` queda sólo la segunda.
  */
 export function AppProviders({ children }: { children: ReactNode }) {
   const content = <UserProvider>{children}</UserProvider>
-  if (!PRIVY_APP_ID) return content
+  if (!isCavosEnabled()) return content
 
   return (
-    <PrivyProvider
-      appId={PRIVY_APP_ID}
-      config={{
-        // Cada método es una cuenta de Privy distinta —y por lo tanto otra
-        // wallet— salvo que el usuario los vincule desde su perfil
-        // (LoginMethodsLinks). Qué métodos están activos se decide en
-        // lib/auth/loginMethods.
-        loginMethods: PRIVY_LOGIN_METHODS,
-        appearance: { theme: 'light', accentColor: '#f97316' },
-        // La wallet Stellar se crea a mano después del login (usePrivyLogin);
-        // las de Ethereum y Solana no las queremos.
-        embeddedWallets: {
-          ethereum: { createOnLogin: 'off' },
-          solana: { createOnLogin: 'off' },
-        },
-      }}
-    >
-      <PrivyBridge />
+    <CavosProvider config={cavosConfig} modal={cavosModalConfig}>
+      <CavosBridge />
       {content}
-    </PrivyProvider>
+    </CavosProvider>
   )
 }

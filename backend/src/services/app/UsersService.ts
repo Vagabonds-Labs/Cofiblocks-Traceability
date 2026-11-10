@@ -5,7 +5,8 @@ import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { DbRefreshToken, DbSessions, DbUsers, UserEntry } from '@/services/db';
 import * as OnChainTraceabilityService from '@/services/onchain/OnChainTraceabilityService';
-import { verifyStellarSignature } from '@/utils/stellarSignature';
+import { ContractFactory } from '@/lib/StellarContracts';
+import { verifyCavosSignature, verifyStellarSignature } from '@/utils/stellarSignature';
 import * as NonceService from './NonceService';
 import * as NotificationService from './NotificationService';
 import { RegisterUserData, UserResponse } from './types';
@@ -28,12 +29,22 @@ export async function registerUser(
   // El nonce tiene que haberlo emitido el backend y no haberse usado antes.
   await NonceService.consumeNonce(data.nonce, data.walletAddress);
 
-  // Verificación ed25519 local, formato SEP-53. No hace falta tocar la red.
-  verifyStellarSignature(
-    data.walletAddress,
-    NonceService.buildLoginMessage(data.nonce),
-    data.signature
-  );
+  const message = NonceService.buildLoginMessage(data.nonce);
+  if (data.walletProvider === 'cavos') {
+    // Cavos firma con su propio prefijo y, en un dispositivo agregado después,
+    // con una clave distinta de la cuenta: hay que comprobar que la controla.
+    const client = new ContractFactory().getClient();
+    await verifyCavosSignature(
+      data.walletAddress,
+      data.signer ?? data.walletAddress,
+      message,
+      data.signature,
+      (address) => client.loadAccountOrNull(address)
+    );
+  } else {
+    // Verificación ed25519 local, formato SEP-53. No hace falta tocar la red.
+    verifyStellarSignature(data.walletAddress, message, data.signature);
+  }
 
   const existingUser = await dbUsers.findUserByWalletAddress(data.walletAddress);
   if (existingUser) {
