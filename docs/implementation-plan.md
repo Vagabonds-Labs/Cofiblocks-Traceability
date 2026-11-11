@@ -53,7 +53,7 @@ Each week ends with a **visual demo**, with real transactions on Stellar Testnet
 - [x] **Faucet:** `cofi-faucet` account, `POST /api/wallet/fund` (once per user, exactly-once with hash reconciliation), `GET /api/wallet`; Friendbot hash recorded for own wallets.
 - [x] **Web app:** `WalletCard` with address, balance and funding transaction on home and profile; Cavos account creation on first use (1-stroop `execute`).
 - [x] Review findings R7 (refresh URL), R8 (signer check), R9 (delete with role) and R10 (per-account lock, in process).
-- [ ] Check the Cavos account creation + faucet in a real browser login (needs Jonatan).
+- [x] Cavos account creation + faucet checked with a real login (November 11): Cavos created the sponsored account and the faucet sent 10 XLM 31 seconds later. The Cavos login screens are now ours, translated, because Cavos's modal is English only.
 - [x] Database on Supabase (November 11): migrations and seed applied; RLS on every table and no table privileges for `anon`/`authenticated`, so the Data API exposes nothing.
 - [ ] Staging (postponed), together with R6 (cross-domain cookies).
 

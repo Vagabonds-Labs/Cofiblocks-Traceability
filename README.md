@@ -68,7 +68,7 @@ The current work is a 4-week sprint funded by a **Stellar Instaward** (November 
 | Week | Focus | Status |
 |---|---|---|
 | 0 (Nov 9–13) | Repo base, v0 contract on testnet, Cavos login, roles and farmer upload, languages | ✅ Nearly done |
-| 1 (Nov 16–20) | Invisible wallets with a faucet, farmer-agent wallet, VoiceLedger integration, staging | 🟡 Code done and tested on testnet; staging and the Cavos check in a real browser pending |
+| 1 (Nov 16–20) | Invisible wallets with a faucet, farmer-agent wallet, VoiceLedger integration, staging | 🟡 Done and tested on testnet with a real Cavos login, data on Supabase; staging pending |
 | 2 (Nov 23–27) | v1 contract with every permission and its tests, farmer deliveries and profile | 🟡 v1 contract deployed early (29 tests); deliveries and profile pending |
 | 3 (Nov 30 – Dec 4) | Web app for the full flow: weight, stages, documents, history and CSV | ⏳ |
 | 4 (Dec 7–11) | End-to-end tests, CI tests, demo and documentation | ⏳ |
