@@ -1,7 +1,7 @@
 import { StaffRole } from '@prisma/client';
 
 import { HttpException } from '@/exceptions/HttpException';
-import { ContractFactory, EventsClient } from '@/lib/StellarContracts';
+import { ContractFactory, DEFAULT_VALIDITY_SECONDS, EventsClient, StellarClient } from '@/lib/StellarContracts';
 import { ROLES } from '@/lib/StellarContracts/types';
 import { isSameAddress, withAccountLock } from '@/lib/StellarContracts/utils';
 import { logger } from '@/lib/logger';
@@ -82,9 +82,24 @@ export async function registerFarmer(
   return hash;
 }
 
-/** Checks that a confirmed transaction registered exactly this farmer. */
+/**
+ * Checks that a confirmed transaction registered exactly this farmer.
+ *
+ * The RPC keeps transactions only for a few hours, so reconciling an old
+ * registration may not find its events. The contract's state is the lasting
+ * proof: if it already has this farmer in this cooperative, it is registered.
+ */
 export async function verifyFarmerRegistered(hash: string, farmerRef: string, coop: number): Promise<void> {
-  const [event] = (await eventsClient.getTransactionEvents(hash)).parseFarmerRegistered();
+  let event;
+  try {
+    [event] = (await eventsClient.getTransactionEvents(hash)).parseFarmerRegistered();
+  } catch (error) {
+    if (!(error instanceof HttpException && error.code === 'TRANSACTION_NOT_FOUND')) throw error;
+    const onChain = await getFarmer(farmerRef);
+    if (onChain?.coop !== coop) throw error;
+    logger.info({ farmerRef, coop, hash }, 'Farmer registration verified from contract state');
+    return;
+  }
   if (!event || event.farmer_ref !== farmerRef || event.coop !== coop) {
     logger.error({ event, farmerRef, coop, hash }, 'farmer_registered event does not match');
     throw new HttpException(502, 'Failed to register farmer on chain', 'FAILED_TO_REGISTER_FARMER');
@@ -92,9 +107,14 @@ export async function verifyFarmerRegistered(hash: string, farmerRef: string, co
   logger.info({ farmerRef, coop, hash }, 'Registered farmer on chain');
 }
 
-/** How a submitted transaction ended (see `StellarClient.getTransactionOutcome`). */
-export function getTransactionOutcome(hash: string) {
-  return contracts.getClient().getTransactionOutcome(hash);
+/**
+ * How a farmer-agent transaction ended (see `StellarClient.getTransactionOutcome`).
+ * `validUntil` is the stored expiry of the transaction.
+ */
+export function getTransactionOutcome(hash: string, validUntil: Date | null) {
+  return contracts
+    .getClient()
+    .getTransactionOutcome(hash, StellarClient.validityWindow(validUntil, DEFAULT_VALIDITY_SECONDS));
 }
 
 export async function getFarmer(farmerRef: string) {

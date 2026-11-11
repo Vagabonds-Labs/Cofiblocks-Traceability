@@ -6,7 +6,6 @@ import { logger } from '@/lib/logger';
 import { parseCsv } from '@/utils/csv';
 import * as OnChainTraceabilityService from '@/services/onchain/OnChainTraceabilityService';
 import { getExplorerBaseURL } from '@/services/onchain/OnChainEnvService';
-import { StellarClient } from '@/lib/StellarContracts';
 
 /** Headers accepted by the import. Only the first two are required. */
 export const FARMER_CSV_COLUMNS = [
@@ -423,9 +422,9 @@ function registrationPending(): HttpException {
  *
  * The hash is stored before sending. A later call that finds a stored hash
  * without `registeredAt` asks the network how it ended instead of sending
- * another transaction: confirmed → done; failed or surely expired → send a new
- * one; not visible yet → still pending (a transaction that does not show up
- * yet may still land).
+ * another transaction: confirmed → done; failed, or proven never to have landed
+ * → send a new one; anything else → still pending (a transaction that does not
+ * show up yet may have landed or still land).
  */
 async function ensureRegisteredOnChain(
   farmer: { id: string; registerTx: string | null; registerTxValidUntil: Date | null; registeredAt: Date | null },
@@ -444,14 +443,16 @@ async function ensureRegisteredOnChain(
   };
 
   if (farmer.registerTx) {
-    const outcome = await OnChainTraceabilityService.getTransactionOutcome(farmer.registerTx);
+    const outcome = await OnChainTraceabilityService.getTransactionOutcome(
+      farmer.registerTx,
+      farmer.registerTxValidUntil
+    );
     if (outcome === 'success') return markRegistered(farmer.registerTx);
-    if (outcome === 'unknown' && !StellarClient.hasSurelyExpired(farmer.registerTxValidUntil)) {
-      throw registrationPending();
-    }
+    if (outcome === 'pending') throw registrationPending();
   }
 
   let sentHash: string | null = null;
+  let sentValidUntil: Date | null = null;
   try {
     const hash = await OnChainTraceabilityService.registerFarmer(farmerRef, coop, async (hash, validUntil) => {
       // Claim the registration: only if nobody stored another hash meanwhile.
@@ -461,13 +462,14 @@ async function ensureRegisteredOnChain(
       });
       if (count === 0) throw registrationPending();
       sentHash = hash;
+      sentValidUntil = validUntil;
     });
     return await markRegistered(hash);
   } catch (error) {
     if (!sentHash) throw error;
-    const outcome = await OnChainTraceabilityService.getTransactionOutcome(sentHash).catch(() => 'unknown' as const);
+    const outcome = await OnChainTraceabilityService.getTransactionOutcome(sentHash, sentValidUntil);
     if (outcome === 'success') return markRegistered(sentHash);
-    if (outcome === 'failed') {
+    if (outcome === 'failed' || outcome === 'never_landed') {
       await prisma.farmer.updateMany({
         where: { id: farmer.id, registerTx: sentHash, registeredAt: null },
         data: { registerTx: null, registerTxValidUntil: null },

@@ -47,7 +47,8 @@ Every event has an `event_id` chosen by VoiceLedger (a UUID is fine).
 - **Same `event_id` with a different `type` or `data`:** rejected with `409 EVENT_ID_REUSED`.
 - **A new farmer action** (for example the farmer types their ID again after a mistake) needs a **new** `event_id`.
 - Business errors (4xx) are final for that `event_id`. Server errors (5xx) are retried when the same `event_id` arrives again.
-- `503 REGISTRATION_PENDING` means the on-chain transaction was sent but is not confirmed yet: retry the same `event_id` a minute later. We never send a second transaction for it while the first one may still land.
+- `503 REGISTRATION_PENDING` means the on-chain transaction was sent but is not confirmed yet: retry the same `event_id` a minute later. We never send a second transaction for it until the network proves the first one never landed.
+- `503 STELLAR_RPC_UNAVAILABLE` and `503 TRANSACTION_NOT_FOUND` mean the Stellar network could not be read at that moment: retry the same `event_id` later.
 - If two copies arrive at the same time, one is processed and the other gets `202` with `"status": "processing"`; check `GET …/events/{event_id}` a few seconds later.
 
 ## Envelope

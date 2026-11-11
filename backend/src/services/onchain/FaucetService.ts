@@ -67,8 +67,10 @@ async function markFunded(userId: string, hash: string): Promise<Date> {
  *   other request stored one (or the stored one expired without landing);
  * - if the outcome of a payment is unknown (a timeout, a crash), the claim is
  *   kept: a payment that does not show up yet may still land. The next
- *   request looks the stored hash up on Horizon, and only pays again once that
- *   payment has surely expired without landing.
+ *   request looks the stored hash up, and only pays again once the network
+ *   proves it never landed: expired AND absent from an index that has caught
+ *   up past its expiry (see `StellarClient.getTransactionOutcome`). If Horizon
+ *   and the RPC lag or are down, the payment stays pending.
  */
 export async function fundUser(userId: string): Promise<FundingResult> {
   requireTestnet();
@@ -84,13 +86,13 @@ export async function fundUser(userId: string): Promise<FundingResult> {
 
   // A previous request may have submitted a payment that we never confirmed.
   if (user.fundTx) {
-    const outcome = await client.getTransactionOutcome(user.fundTx);
+    const window = StellarClient.validityWindow(user.fundTxValidUntil, PAYMENT_VALIDITY_SECONDS);
+    const outcome = await client.getTransactionOutcome(user.fundTx, window);
     if (outcome === 'success') {
       return { tx_hash: user.fundTx, funded_at: await markFunded(user.id, user.fundTx), already_funded: true };
     }
-    if (outcome === 'unknown' && !StellarClient.hasSurelyExpired(user.fundTxValidUntil)) {
-      throw pending();
-    }
+    if (outcome === 'pending') throw pending();
+    // `failed` or `never_landed`: no funds moved, a new payment is safe.
   }
 
   if (!(await client.loadAccountOrNull(user.walletAddress))) {
@@ -110,21 +112,23 @@ export async function fundUser(userId: string): Promise<FundingResult> {
     tx.sign(faucet);
     const hash = Buffer.from(tx.hash()).toString('hex');
 
+    const validUntil = new Date(Number(tx.timeBounds!.maxTime) * 1000);
     const { count } = await prisma.user.updateMany({
       where: { id: user.id, fundedAt: null, fundTx: user.fundTx },
-      data: { fundTx: hash, fundTxValidUntil: new Date(Number(tx.timeBounds!.maxTime) * 1000) },
+      data: { fundTx: hash, fundTxValidUntil: validUntil },
     });
     if (count === 0) throw pending();
 
     try {
       await contractFactory.getTxSubmitter().submitAsService(tx);
     } catch (error) {
-      const outcome = await client.getTransactionOutcome(hash).catch(() => 'unknown' as const);
+      const window = StellarClient.validityWindow(validUntil, PAYMENT_VALIDITY_SECONDS);
+      const outcome = await client.getTransactionOutcome(hash, window);
       if (outcome === 'success') {
         // It landed after all (e.g. the confirmation poll timed out).
         return { tx_hash: hash, funded_at: await markFunded(user.id, hash), already_funded: false };
       }
-      if (outcome === 'failed') {
+      if (outcome === 'failed' || outcome === 'never_landed') {
         // It surely did not move funds: release the claim so it can be retried.
         await prisma.user.updateMany({
           where: { id: user.id, fundTx: hash, fundedAt: null },

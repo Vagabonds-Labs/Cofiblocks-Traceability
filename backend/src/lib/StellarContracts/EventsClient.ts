@@ -158,17 +158,23 @@ export class EventsClient {
     this.client = client ?? new StellarClient();
   }
 
+  /**
+   * Both failures here are temporary, so both are 503 (retryable): the hashes
+   * looked up are always ones the backend submitted itself, and "not found"
+   * means the RPC has not indexed it (or no longer keeps it), not that the
+   * request was wrong. A 4xx would make VoiceLedger give up on the event.
+   */
   public async getTransactionEvents(txHash: string): Promise<EventsParser> {
     let result: rpc.Api.GetTransactionResponse;
     try {
       result = await this.client.rpc.getTransaction(txHash);
     } catch (error) {
       logger.error({ error, txHash }, 'Could not fetch transaction from Soroban RPC');
-      throw new HttpException(400, 'Transaction not found', 'TRANSACTION_NOT_FOUND');
+      throw new HttpException(503, 'The Stellar RPC is unavailable. Retry later.', 'STELLAR_RPC_UNAVAILABLE');
     }
 
     if (result.status === rpc.Api.GetTransactionStatus.NOT_FOUND) {
-      throw new HttpException(400, 'Transaction not found', 'TRANSACTION_NOT_FOUND');
+      throw new HttpException(503, 'The transaction is not visible on the Stellar RPC yet', 'TRANSACTION_NOT_FOUND');
     }
     if (result.status === rpc.Api.GetTransactionStatus.FAILED) {
       return new EventsParser([], true);

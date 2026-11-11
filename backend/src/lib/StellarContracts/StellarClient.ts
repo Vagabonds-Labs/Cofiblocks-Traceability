@@ -2,8 +2,16 @@ import { Horizon, Keypair, NotFoundError, rpc } from '@stellar/stellar-sdk';
 
 import { getDeployment, NetworkDeployment } from './deployments';
 
-/** Safety margin after a transaction's `maxTime` before it counts as expired. */
-const EXPIRY_MARGIN_MS = 30_000;
+/** Margin between this server's clock and the ledgers' close times. */
+const CLOCK_MARGIN_MS = 5 * 60_000;
+
+export type TransactionOutcome = 'success' | 'failed' | 'pending' | 'never_landed';
+
+/** When a transaction could land: after `notBefore`, up to its `maxTime`. */
+export interface ValidityWindow {
+	notBefore: Date;
+	validUntil: Date;
+}
 
 /**
  * Single access point to the network: Soroban RPC, Horizon and the account the
@@ -97,29 +105,79 @@ export class StellarClient {
 	}
 
 	/**
-	 * How a submitted transaction ended, as Horizon sees it.
+	 * How a transaction we submitted ended.
 	 *
-	 * `unknown` means Horizon has no record of it: it may still land, or it may
-	 * never land. It is NOT a failure. Only after its time bounds have passed
-	 * (see `hasSurelyExpired`) can a missing transaction be treated as one that
-	 * will never land.
+	 * - `success` / `failed`: the Soroban RPC or Horizon has it.
+	 * - `never_landed`: neither has it, and one of them has indexed every ledger
+	 *   it could have landed in, from before it was signed to a ledger that
+	 *   closed after its `maxTime`. A transaction is only valid in a ledger whose
+	 *   close time is at most its `maxTime`, and ledgers are indexed in order, so
+	 *   once a later ledger is indexed there is no chance left.
+	 * - `pending`: anything else. Not visible yet, a source that is down, or a
+	 *   source that lags behind the network: it may have landed or still land.
+	 *   Never treat it as a failure.
+	 *
+	 * The wall clock alone is not enough: a transaction can land before it
+	 * expires and show up in an index that is still catching up.
 	 */
-	public async getTransactionOutcome(hash: string): Promise<'success' | 'failed' | 'unknown'> {
+	public async getTransactionOutcome(hash: string, window: ValidityWindow | null): Promise<TransactionOutcome> {
+		const expired = !!window && window.validUntil.getTime() < Date.now();
+		const from = window ? window.notBefore.getTime() / 1000 : 0;
+		const until = window ? window.validUntil.getTime() / 1000 : 0;
+
+		// Soroban RPC: one response says both "not found" and how far it has indexed.
 		try {
-			const tx = await this.getHorizon().transactions().transaction(hash).call();
-			return tx.successful ? 'success' : 'failed';
-		} catch (error) {
-			if (error instanceof NotFoundError) return 'unknown';
-			throw error;
+			const result = await this.rpc.getTransaction(hash);
+			if (result.status === rpc.Api.GetTransactionStatus.SUCCESS) return 'success';
+			if (result.status === rpc.Api.GetTransactionStatus.FAILED) return 'failed';
+			if (
+				expired &&
+				Number(result.oldestLedgerCloseTime) <= from &&
+				Number(result.latestLedgerCloseTime) > until
+			) {
+				return 'never_landed';
+			}
+		} catch {
+			// RPC unavailable: no evidence either way. Ask Horizon.
 		}
+
+		// Horizon. Its indexing progress is read BEFORE the lookup, so a "not found"
+		// covers at least the ledgers that progress reports.
+		try {
+			const horizon = this.getHorizon();
+			// Without its progress Horizon can still confirm the transaction, just not
+			// prove its absence.
+			const root = expired ? await horizon.root().catch(() => null) : null;
+			try {
+				const tx = await horizon.transactions().transaction(hash).call();
+				return tx.successful ? 'success' : 'failed';
+			} catch (error) {
+				if (!(error instanceof NotFoundError)) return 'pending';
+			}
+			if (root && Date.parse(root.history_latest_ledger_closed_at) / 1000 > until) {
+				const elder = await horizon.ledgers().ledger(root.history_elder_ledger).call();
+				// The SDK types `ledger(n).call()` as a page; it returns a single record.
+				if (Date.parse((elder as unknown as { closed_at: string }).closed_at) / 1000 <= from) {
+					return 'never_landed';
+				}
+			}
+		} catch {
+			// Horizon unavailable: no evidence.
+		}
+		return 'pending';
 	}
 
 	/**
-	 * `true` once a transaction valid until `validUntil` can no longer land.
-	 * Ledger close times lag the wall clock slightly, so this waits a margin.
+	 * The ledgers a transaction could have landed in. It cannot land before it
+	 * was signed (`validUntil - validForSeconds`); the margin absorbs the
+	 * difference between this server's clock and the ledgers' close times.
 	 */
-	public static hasSurelyExpired(validUntil: Date | null): boolean {
-		return !!validUntil && validUntil.getTime() + EXPIRY_MARGIN_MS < Date.now();
+	public static validityWindow(validUntil: Date | null, validForSeconds: number): ValidityWindow | null {
+		if (!validUntil) return null;
+		return {
+			notBefore: new Date(validUntil.getTime() - validForSeconds * 1000 - CLOCK_MARGIN_MS),
+			validUntil,
+		};
 	}
 
 	/** Horizon is needed for classic balances and trustlines; the RPC does not expose them. */

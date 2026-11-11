@@ -14,7 +14,7 @@ import { ContractKind, toDomainError } from './errors';
 import { PreparedTransaction } from './types/transactions';
 
 /** How long a prepared transaction stays valid before it has to be requested again. */
-const DEFAULT_VALIDITY_SECONDS = 5 * 60;
+export const DEFAULT_VALIDITY_SECONDS = 5 * 60;
 
 /** Base fee per operation, in stroops. The fee-bump covers the rest. */
 const BASE_FEE = '1000';
