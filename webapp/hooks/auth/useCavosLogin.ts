@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useCavos } from '@cavos/kit/react'
 
+import { normalizeEmailCode } from '@/lib/auth/cavos'
 import { authService } from '@/services/auth'
 
 /**
@@ -37,13 +38,22 @@ function bytesToBase64(bytes: Uint8Array): string {
   return btoa(binary)
 }
 
+/** Cavos's own message when a device has to sign in again to be restored. */
+const RESTORE_DEVICE_MESSAGE = 'Sign in again to restore this device.'
+
+export type CavosLoginError = 'generic' | 'send_email' | 'code' | 'restore_device'
+
 /**
  * Cavos login (Telegram or email).
  *
- * Cavos handles authentication and the wallet: it shows its modal, and when it
- * finishes it exposes the user's Stellar account (`G…`). This hook does the
+ * Cavos handles authentication and the wallet; our own screens
+ * (`CavosLoginPanel`) call `loginWithTelegram`, `sendCode` and `verifyCode`.
+ * When Cavos exposes the user's Stellar account (`G…`), this hook does the
  * rest, same as with an own wallet: it requests the nonce from the backend,
  * signs it with the Cavos wallet and calls `register_wallet`.
+ *
+ * Errors are returned as keys, not as Cavos's English messages, so the screen
+ * shows them in the user's language.
  *
  * The Cavos signature is not SEP-53 and is made by the device's "control key",
  * which may not be the account: that is why `signer` is sent too and the
@@ -55,8 +65,9 @@ export function useCavosLogin(onLoggedIn: () => void) {
     address,
     wallet,
     walletStatus,
-    openModal,
-    closeModal,
+    login,
+    sendOtp,
+    verifyOtp,
     signMessage,
     authorizeDevice,
     authorizingDevice,
@@ -67,7 +78,7 @@ export function useCavosLogin(onLoggedIn: () => void) {
 
   const [pending, setPending] = useState(false)
   const [isRegistering, setIsRegistering] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<CavosLoginError | null>(null)
   const registering = useRef(false)
   const authorizing = useRef(false)
 
@@ -85,22 +96,69 @@ export function useCavosLogin(onLoggedIn: () => void) {
   const fail = useCallback(
     (err: unknown) => {
       console.error('Cavos login failed', err)
-      setError((err as Error)?.message || 'Login failed')
+      setError('generic')
       finish()
       logout()
     },
     [finish, logout]
   )
 
-  const start = useCallback(() => {
+  /** Marks a login as started, so the effect below registers the session. */
+  const begin = useCallback(() => {
     setError(null)
     clearAuthError()
     writePending(true)
     setPending(true)
-    // If Cavos already had the session (for example, after signing out of our
-    // app only), the modal is not needed: the effect below signs directly.
-    if (!isAuthenticated) openModal()
-  }, [isAuthenticated, openModal, clearAuthError])
+  }, [clearAuthError])
+
+  /**
+   * Telegram redirects out of the app. If Cavos already had the session (for
+   * example, after signing out of our app only), no redirect is needed: the
+   * effect below signs directly.
+   */
+  const loginWithTelegram = useCallback(async () => {
+    begin()
+    if (isAuthenticated) return
+    try {
+      await login('telegram')
+    } catch (err) {
+      fail(err)
+    }
+  }, [begin, isAuthenticated, login, fail])
+
+  /** Emails a sign-in code. Returns whether it was sent. */
+  const sendCode = useCallback(
+    async (email: string): Promise<boolean> => {
+      setError(null)
+      clearAuthError()
+      try {
+        await sendOtp(email)
+        return true
+      } catch (err) {
+        console.error('Cavos could not send the code', err)
+        setError('send_email')
+        return false
+      }
+    },
+    [sendOtp, clearAuthError]
+  )
+
+  /** Checks the emailed code; on success the effect below finishes the login. */
+  const verifyCode = useCallback(
+    async (email: string, code: string): Promise<boolean> => {
+      begin()
+      try {
+        await verifyOtp(email, normalizeEmailCode(code))
+        return true
+      } catch (err) {
+        console.error('Cavos rejected the code', err)
+        finish()
+        setError('code')
+        return false
+      }
+    },
+    [begin, verifyOtp, finish]
+  )
 
   const register = useCallback(
     async (account: string) => {
@@ -112,7 +170,6 @@ export function useCavosLogin(onLoggedIn: () => void) {
         const { signature, publicKey } = await signMessage(message)
         await authService.registerWallet(account, bytesToBase64(signature), nonce, 'cavos', publicKey)
         finish()
-        closeModal()
         onLoggedIn()
       } catch (err) {
         fail(err)
@@ -120,7 +177,7 @@ export function useCavosLogin(onLoggedIn: () => void) {
         registering.current = false
       }
     },
-    [signMessage, finish, closeModal, onLoggedIn, fail]
+    [signMessage, finish, onLoggedIn, fail]
   )
 
   useEffect(() => {
@@ -145,10 +202,19 @@ export function useCavosLogin(onLoggedIn: () => void) {
     }
   }, [pending, isAuthenticated, address, wallet, walletStatus, authorizingDevice, authorizeDevice, register, fail])
 
+  const cavosError: CavosLoginError | null = authError
+    ? authError === RESTORE_DEVICE_MESSAGE
+      ? 'restore_device'
+      : 'generic'
+    : null
+
   return {
-    start,
-    isBusy: pending && isAuthenticated,
+    loginWithTelegram,
+    sendCode,
+    verifyCode,
+    /** A login is in progress after authenticating (Telegram return, device, backend). */
+    isBusy: pending && (isAuthenticated || walletStatus.isDeploying),
     isRegistering,
-    error: error ?? authError,
+    error: error ?? cavosError,
   }
 }

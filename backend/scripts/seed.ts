@@ -87,7 +87,7 @@ async function main() {
           update: { name: center.name },
         });
       }
-      console.log(`✓ ${coop.name} (${coop.centers.length} centros)`);
+      console.log(`✓ ${coop.name} (${coop.centers.length} centers)`);
     }
   } finally {
     await prisma.$disconnect();

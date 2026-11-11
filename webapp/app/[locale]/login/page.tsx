@@ -61,7 +61,7 @@ export default function LoginPage() {
           <p className="relative text-xs text-white/60">{t('auth.brand_footer')}</p>
         </section>
 
-        {/* Formulario */}
+        {/* Form */}
         <section className="p-6 sm:p-10">
           <h1 className="text-3xl font-bold text-[rgb(var(--cb-text))]">
             {cavos ? t('auth.login_title') : t('auth.title_sign_in')}

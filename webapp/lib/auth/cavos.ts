@@ -1,4 +1,4 @@
-import type { CavosConfig, CavosModalConfig } from '@cavos/kit/react'
+import type { CavosConfig } from '@cavos/kit/react'
 
 /** App ID from the Cavos dashboard. Without it, the app offers wallet login only. */
 export const CAVOS_APP_ID = process.env.NEXT_PUBLIC_CAVOS_APP_ID
@@ -23,12 +23,13 @@ export const cavosConfig: CavosConfig = {
   appSalt: 'cofiblocks-traceability',
 }
 
-/** Cavos login modal: Telegram first, because that is what the pilot uses. */
-export const cavosModalConfig: CavosModalConfig = {
-  appName: 'CofiBlocks Traceability',
-  appLogo: '/images/logo.png',
-  providers: ['telegram', 'email'],
-  primaryColor: '#286b56',
-  theme: 'light',
-  radius: 12,
+/**
+ * Length of the sign-in code Cavos emails. The kit does not export it from its
+ * public entry points; it is `EMAIL_CODE_LENGTH` in `@cavos/kit` 0.5.2.
+ */
+export const CAVOS_EMAIL_CODE_LENGTH = 9
+
+/** Same normalization Cavos applies to a typed code (lower case, no spaces or dashes). */
+export function normalizeEmailCode(raw: string): string {
+  return raw.toLowerCase().replace(/[\s-]/g, '')
 }

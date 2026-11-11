@@ -21,7 +21,7 @@ REST API built with Express + Prisma/Postgres. It is the core of the system: it 
 backend/
 ├── prisma/
 │   ├── schema.prisma          # models (see below)
-│   └── migrations/            # a single initial migration: needs a new database
+│   └── migrations/            # applied with `prisma migrate deploy`; need a new database
 ├── scripts/
 │   ├── seed.ts                # union, 3 cooperatives and their 11 collection centers
 │   └── grant-admin.ts         # grants admin rights to an address
@@ -55,6 +55,16 @@ backend/
 
 Requirements: Node.js 20+ and a **new** Postgres database. The initial migration is not compatible with the marketplace database.
 
+The shared database is on **Supabase**. Supabase also exposes the `public` schema through its REST Data API with the public `anon` key; the `lock_down_public_schema` migration turns RLS on for every table and removes the table privileges of `anon` and `authenticated`, also for tables created later. Only the backend, connecting as the table owner, can read or write. Any new table should still get `ENABLE ROW LEVEL SECURITY` in its migration.
+
+For a local database, a Docker container with a named volume survives restarts (the URL in `.env` is then `postgresql://postgres@127.0.0.1:55432/traceability`):
+
+```bash
+docker run -d --name cofiblocks-traceability-db --restart unless-stopped \
+  -p 127.0.0.1:55432:5432 -v cofiblocks-traceability-pgdata:/var/lib/postgresql/data \
+  -e POSTGRES_DB=traceability -e POSTGRES_HOST_AUTH_METHOD=trust postgres:16-alpine
+```
+
 ```bash
 npm install
 cp .env.example .env         # generate the JWT secrets with: openssl rand -hex 32
@@ -73,7 +83,7 @@ npm run admin:grant -- G…
 
 | Variable | Purpose |
 |---|---|
-| `DATABASE_URL`, `DIRECT_URL` | Postgres. With Supabase, the first goes through the pooler and the second is the direct connection used for migrations. |
+| `DATABASE_URL`, `DIRECT_URL` | Postgres. With Supabase, the first is the transaction pooler (port 6543, with `?pgbouncer=true`) and the second the session pooler or direct connection (port 5432), used for migrations. |
 | `PORT`, `FRONTEND_URL`, `BACKEND_URL` | URLs. If the web app and the API are on different domains, cookies are issued as cross-domain. |
 | `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `JWT_*_EXPIRY` | Sessions. Required: the backend refuses to start if a secret is missing, shorter than 32 characters, still the example value, or equal to the other one. `JWT_ACCESS_SECRET` must match the web app's `JWT_SECRET`. |
 | `STELLAR_NETWORK` | `testnet` (default) or `mainnet`. |
@@ -154,7 +164,7 @@ Retries with the same `event_id` get the stored answer and never write on chain 
 
 By sprint week (details in the [plan](../docs/implementation-plan.md)):
 
-- **Staging and Supabase** (postponed): deploy, the cross-domain cookie setup (review finding R6) and moving the database to Supabase.
+- **Staging** (postponed): deploy and the cross-domain cookie setup (review finding R6).
 - **Week 2:** the `Batch`, `BatchEvent`, `Plot` and `Document` models; VoiceLedger events for consent, profile and deliveries; VoiceLedger simulator and OpenAPI document.
 - **Week 3:** endpoints for reception (weight and receipt), stage changes, documents, batch history and CSV export; notifications to VoiceLedger.
 - **Week 4:** permission tests for every role against every endpoint, in CI.

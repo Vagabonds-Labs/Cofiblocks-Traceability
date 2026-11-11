@@ -78,7 +78,7 @@ It needs the backend running (see [backend/README.md](../backend/README.md)). In
 In the Cavos dashboard you need to:
 
 - register the web app's origins (`http://localhost:3000`, staging…), because the Cavos vault only loads on registered origins;
-- add the login callback URLs (`/login` and its per-language variants, such as `/es/login`);
+- add the login callback URLs for every origin and language: `/login`, `/es/login`, `/om/login` and `/am/login` (for example `http://localhost:3000/om/login`). Cavos returns to the page where the login started, so a language without its URL fails with `redirect_uri is not registered for this app`;
 - enable email and Telegram as login methods.
 
 The configuration is in `lib/auth/cavos.ts`. **`appSalt` cannot change** once there are users: it names the place where each device stores its key, and if it changes, every user is left waiting to approve their device.
@@ -88,6 +88,7 @@ The configuration is in `lib/auth/cavos.ts`. **`appSalt` cannot change** once th
 English (default), Spanish, Afaan Oromoo (`om`) and Amharic (`am`).
 
 - The language is chosen in the header and saved in a cookie.
+- The login screens are ours (`components/auth/CavosLoginPanel.tsx`), not Cavos's modal, because the modal is English only. They call Cavos's `login('telegram')`, `sendOtp` and `verifyOtp`; `CavosProvider` gets no `modal` prop, so Cavos never renders its own.
 - Amharic uses the Noto Sans Ethiopic font, because Manrope does not include its script.
 - The Oromo and Amharic texts are a first draft and need review by a native speaker.
 - To add a text: use the same key in all four files in `locales/`.
