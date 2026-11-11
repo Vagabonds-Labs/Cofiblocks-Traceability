@@ -1,7 +1,7 @@
-import { Asset, BASE_FEE, Horizon, NotFoundError, Operation, TransactionBuilder } from '@stellar/stellar-sdk';
+import { Asset, BASE_FEE, Horizon, Operation, TransactionBuilder } from '@stellar/stellar-sdk';
 
 import { HttpException } from '@/exceptions/HttpException';
-import { ContractFactory } from '@/lib/StellarContracts';
+import { ContractFactory, StellarClient } from '@/lib/StellarContracts';
 import { withAccountLock } from '@/lib/StellarContracts/utils';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
@@ -37,18 +37,9 @@ function nativeBalance(account: Horizon.AccountResponse): number {
   return native ? Number(native.balance) : 0;
 }
 
-/**
- * Status of a funding transaction on the network: `success`, `failed`, or
- * `unknown` if Horizon has no record of it (not landed yet, or never will).
- */
-async function transactionStatus(hash: string): Promise<'success' | 'failed' | 'unknown'> {
-  try {
-    const tx = await contractFactory.getClient().getHorizon().transactions().transaction(hash).call();
-    return tx.successful ? 'success' : 'failed';
-  } catch (error) {
-    if (error instanceof NotFoundError) return 'unknown';
-    throw error;
-  }
+/** A payment is in flight: retryable, so the client should try again shortly. */
+function pending(): HttpException {
+  return new HttpException(409, 'Funding is in progress. Try again in a minute.', 'FUNDING_IN_PROGRESS');
 }
 
 async function refillIfLow(faucetAddress: string) {
@@ -74,9 +65,10 @@ async function markFunded(userId: string, hash: string): Promise<Date> {
  * - the payment is built and signed first, so its hash and expiry are known;
  * - the user row is then claimed atomically by storing that hash, only if no
  *   other request stored one (or the stored one expired without landing);
- * - if a request dies after submitting, the next one looks the stored hash up
- *   on Horizon instead of paying again, and only retries once the payment has
- *   expired without landing.
+ * - if the outcome of a payment is unknown (a timeout, a crash), the claim is
+ *   kept: a payment that does not show up yet may still land. The next
+ *   request looks the stored hash up on Horizon, and only pays again once that
+ *   payment has surely expired without landing.
  */
 export async function fundUser(userId: string): Promise<FundingResult> {
   requireTestnet();
@@ -88,19 +80,19 @@ export async function fundUser(userId: string): Promise<FundingResult> {
     return { tx_hash: user.fundTx, funded_at: user.fundedAt, already_funded: true };
   }
 
+  const client = contractFactory.getClient();
+
   // A previous request may have submitted a payment that we never confirmed.
   if (user.fundTx) {
-    const status = await transactionStatus(user.fundTx);
-    if (status === 'success') {
+    const outcome = await client.getTransactionOutcome(user.fundTx);
+    if (outcome === 'success') {
       return { tx_hash: user.fundTx, funded_at: await markFunded(user.id, user.fundTx), already_funded: true };
     }
-    const expired = !user.fundTxValidUntil || user.fundTxValidUntil.getTime() < Date.now();
-    if (status === 'unknown' && !expired) {
-      throw new HttpException(409, 'Funding is already in progress. Try again in a minute.', 'FUNDING_IN_PROGRESS');
+    if (outcome === 'unknown' && !StellarClient.hasSurelyExpired(user.fundTxValidUntil)) {
+      throw pending();
     }
   }
 
-  const client = contractFactory.getClient();
   if (!(await client.loadAccountOrNull(user.walletAddress))) {
     throw new HttpException(409, 'The Stellar account does not exist yet', 'ACCOUNT_NOT_DEPLOYED');
   }
@@ -122,21 +114,27 @@ export async function fundUser(userId: string): Promise<FundingResult> {
       where: { id: user.id, fundedAt: null, fundTx: user.fundTx },
       data: { fundTx: hash, fundTxValidUntil: new Date(Number(tx.timeBounds!.maxTime) * 1000) },
     });
-    if (count === 0) {
-      throw new HttpException(409, 'Funding is already in progress. Try again in a minute.', 'FUNDING_IN_PROGRESS');
-    }
+    if (count === 0) throw pending();
 
     try {
       await contractFactory.getTxSubmitter().submitAsService(tx);
     } catch (error) {
-      // Only release the claim if the payment surely did not land.
-      if ((await transactionStatus(hash)) !== 'success') {
+      const outcome = await client.getTransactionOutcome(hash).catch(() => 'unknown' as const);
+      if (outcome === 'success') {
+        // It landed after all (e.g. the confirmation poll timed out).
+        return { tx_hash: hash, funded_at: await markFunded(user.id, hash), already_funded: false };
+      }
+      if (outcome === 'failed') {
+        // It surely did not move funds: release the claim so it can be retried.
         await prisma.user.updateMany({
           where: { id: user.id, fundTx: hash, fundedAt: null },
           data: { fundTx: null, fundTxValidUntil: null },
         });
+        throw error;
       }
-      throw error;
+      // Unknown: it may still land. Keep the claim; the next request reconciles it.
+      logger.warn({ error, userId: user.id, hash }, 'Faucet payment outcome unknown, keeping it pending');
+      throw pending();
     }
 
     const fundedAt = await markFunded(user.id, hash);

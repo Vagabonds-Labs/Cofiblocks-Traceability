@@ -6,6 +6,7 @@ import { logger } from '@/lib/logger';
 import { parseCsv } from '@/utils/csv';
 import * as OnChainTraceabilityService from '@/services/onchain/OnChainTraceabilityService';
 import { getExplorerBaseURL } from '@/services/onchain/OnChainEnvService';
+import { StellarClient } from '@/lib/StellarContracts';
 
 /** Headers accepted by the import. Only the first two are required. */
 export const FARMER_CSV_COLUMNS = [
@@ -327,8 +328,8 @@ export interface IntegrationLinkResult {
  * - A Telegram account already linked to another farmer is never moved
  *   automatically: that farmer is registered on chain, so the cooperative has
  *   to resolve it.
- * - It can be retried safely: `register_farmer` is idempotent on chain and an
- *   existing `registerTx` is returned as is.
+ * - It can be retried safely without writing on chain twice: the transaction
+ *   hash is stored before it is sent (see `ensureRegisteredOnChain`).
  */
 export async function linkFarmerFromIntegration(params: {
   coopCode: string;
@@ -396,11 +397,7 @@ export async function linkFarmerFromIntegration(params: {
   }
 
   const farmerRef = buildFarmerRef(coop.code, coopFarmerId);
-  let txHash = farmer.registerTx;
-  if (!txHash) {
-    txHash = await OnChainTraceabilityService.registerFarmer(farmerRef, coop.chainId);
-    await prisma.farmer.update({ where: { id: farmer.id }, data: { registerTx: txHash } });
-  }
+  const txHash = await ensureRegisteredOnChain(farmer, farmerRef, coop.chainId);
 
   logger.info({ farmerId: farmer.id, farmerRef, txHash }, 'Linked farmer from VoiceLedger');
   return {
@@ -410,4 +407,74 @@ export async function linkFarmerFromIntegration(params: {
     explorer_url: `${getExplorerBaseURL()}/tx/${txHash}`,
     already_linked: alreadyLinked,
   };
+}
+
+function registrationPending(): HttpException {
+  // 503 so the integration treats it as retryable for the same event_id.
+  return new HttpException(
+    503,
+    'The on-chain registration was sent but is not confirmed yet. Retry in a minute.',
+    'REGISTRATION_PENDING'
+  );
+}
+
+/**
+ * Registers the farmer on chain exactly once, and returns the transaction.
+ *
+ * The hash is stored before sending. A later call that finds a stored hash
+ * without `registeredAt` asks the network how it ended instead of sending
+ * another transaction: confirmed → done; failed or surely expired → send a new
+ * one; not visible yet → still pending (a transaction that does not show up
+ * yet may still land).
+ */
+async function ensureRegisteredOnChain(
+  farmer: { id: string; registerTx: string | null; registerTxValidUntil: Date | null; registeredAt: Date | null },
+  farmerRef: string,
+  coop: number
+): Promise<string> {
+  if (farmer.registerTx && farmer.registeredAt) return farmer.registerTx;
+
+  const markRegistered = async (hash: string) => {
+    await OnChainTraceabilityService.verifyFarmerRegistered(hash, farmerRef, coop);
+    await prisma.farmer.update({
+      where: { id: farmer.id },
+      data: { registerTx: hash, registeredAt: new Date(), registerTxValidUntil: null },
+    });
+    return hash;
+  };
+
+  if (farmer.registerTx) {
+    const outcome = await OnChainTraceabilityService.getTransactionOutcome(farmer.registerTx);
+    if (outcome === 'success') return markRegistered(farmer.registerTx);
+    if (outcome === 'unknown' && !StellarClient.hasSurelyExpired(farmer.registerTxValidUntil)) {
+      throw registrationPending();
+    }
+  }
+
+  let sentHash: string | null = null;
+  try {
+    const hash = await OnChainTraceabilityService.registerFarmer(farmerRef, coop, async (hash, validUntil) => {
+      // Claim the registration: only if nobody stored another hash meanwhile.
+      const { count } = await prisma.farmer.updateMany({
+        where: { id: farmer.id, registeredAt: null, registerTx: farmer.registerTx },
+        data: { registerTx: hash, registerTxValidUntil: validUntil },
+      });
+      if (count === 0) throw registrationPending();
+      sentHash = hash;
+    });
+    return await markRegistered(hash);
+  } catch (error) {
+    if (!sentHash) throw error;
+    const outcome = await OnChainTraceabilityService.getTransactionOutcome(sentHash).catch(() => 'unknown' as const);
+    if (outcome === 'success') return markRegistered(sentHash);
+    if (outcome === 'failed') {
+      await prisma.farmer.updateMany({
+        where: { id: farmer.id, registerTx: sentHash, registeredAt: null },
+        data: { registerTx: null, registerTxValidUntil: null },
+      });
+      throw error;
+    }
+    logger.warn({ error, farmerRef, hash: sentHash }, 'Farmer registration outcome unknown, keeping it pending');
+    throw registrationPending();
+  }
 }

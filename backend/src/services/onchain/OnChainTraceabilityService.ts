@@ -60,20 +60,41 @@ export async function revokeRole(walletAddress: string): Promise<string> {
  * Registers a farmer on chain by their `farmer_ref`. The farmer agent signs it
  * (farmers have no wallet) and the admin pays the fee with a fee-bump. The
  * caller must have checked the ID against the cooperative's list first.
+ *
+ * `beforeSubmit` receives the final transaction hash and expiry before
+ * anything is sent, so the caller can store them and reconcile later if the
+ * outcome is unknown. If it throws, nothing is sent.
  */
-export async function registerFarmer(farmerRef: string, coop: number): Promise<string> {
-  const { hash } = await farmerAgentTransaction(async () => {
-    const tx = await contracts.getTraceabilityService().registerFarmer(farmerRef, coop);
-    return contracts.getTxSubmitter().submitSigned(tx.toXDR());
+export async function registerFarmer(
+  farmerRef: string,
+  coop: number,
+  beforeSubmit: (hash: string, validUntil: Date) => Promise<void>
+): Promise<string> {
+  const hash = await farmerAgentTransaction(async () => {
+    const inner = await contracts.getTraceabilityService().registerFarmer(farmerRef, coop);
+    const envelope = contracts.getTxSubmitter().wrapInFeeBump(inner);
+    const hash = Buffer.from(envelope.hash()).toString('hex');
+    await beforeSubmit(hash, new Date(Number(inner.timeBounds!.maxTime) * 1000));
+    await contracts.getTxSubmitter().submitEnvelope(envelope);
+    return hash;
   });
+  await verifyFarmerRegistered(hash, farmerRef, coop);
+  return hash;
+}
 
+/** Checks that a confirmed transaction registered exactly this farmer. */
+export async function verifyFarmerRegistered(hash: string, farmerRef: string, coop: number): Promise<void> {
   const [event] = (await eventsClient.getTransactionEvents(hash)).parseFarmerRegistered();
   if (!event || event.farmer_ref !== farmerRef || event.coop !== coop) {
     logger.error({ event, farmerRef, coop, hash }, 'farmer_registered event does not match');
     throw new HttpException(502, 'Failed to register farmer on chain', 'FAILED_TO_REGISTER_FARMER');
   }
   logger.info({ farmerRef, coop, hash }, 'Registered farmer on chain');
-  return hash;
+}
+
+/** How a submitted transaction ended (see `StellarClient.getTransactionOutcome`). */
+export function getTransactionOutcome(hash: string) {
+  return contracts.getClient().getTransactionOutcome(hash);
 }
 
 export async function getFarmer(farmerRef: string) {

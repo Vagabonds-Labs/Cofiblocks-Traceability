@@ -27,10 +27,11 @@ async function main() {
 
   const statusId = option('--status');
   if (statusId) {
-    const res = await fetch(`${api}/api/integrations/voiceledger/events/${encodeURIComponent(statusId)}`, {
+    const path = `/api/integrations/voiceledger/events/${encodeURIComponent(statusId)}`;
+    const res = await fetch(`${api}${path}`, {
       headers: {
         'X-VoiceLedger-Timestamp': timestamp,
-        'X-VoiceLedger-Signature': signVoiceLedgerPayload(secret, timestamp, ''),
+        'X-VoiceLedger-Signature': signVoiceLedgerPayload(secret, timestamp, 'GET', path, ''),
       },
     });
     console.log(res.status, JSON.stringify(await res.json(), null, 2));
@@ -48,12 +49,13 @@ async function main() {
     occurred_at: new Date().toISOString(),
     data: JSON.parse(data),
   });
-  const res = await fetch(`${api}/api/integrations/voiceledger/events`, {
+  const path = '/api/integrations/voiceledger/events';
+  const res = await fetch(`${api}${path}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'X-VoiceLedger-Timestamp': timestamp,
-      'X-VoiceLedger-Signature': signVoiceLedgerPayload(secret, timestamp, body),
+      'X-VoiceLedger-Signature': signVoiceLedgerPayload(secret, timestamp, 'POST', path, body),
     },
     body,
   });

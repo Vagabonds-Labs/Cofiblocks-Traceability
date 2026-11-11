@@ -58,7 +58,7 @@ export function useWallet() {
     try {
       const current = await walletService.get()
       setWallet(current)
-      if (current.funded_at) {
+      if (current.exists && current.funded_at) {
         setState('ready')
         return
       }
@@ -67,8 +67,11 @@ export function useWallet() {
         setupInFlight = null
       })
       await setupInFlight
-      setWallet(await walletService.get())
-      setState('ready')
+      const updated = await walletService.get()
+      setWallet(updated)
+      // Only a funded account is ready. If setup ran out of attempts (e.g.
+      // Friendbot is slow), show the error with a retry instead.
+      setState(updated.exists && updated.funded_at ? 'ready' : 'error')
     } catch (error) {
       console.error('Wallet setup failed:', error)
       setState('error')

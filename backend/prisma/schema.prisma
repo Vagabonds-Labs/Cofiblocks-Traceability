@@ -148,30 +148,34 @@ model CollectionCenter {
 /// Pilot farmer. Pre-loaded by the cooperative (list of IDs) and completed by
 /// the farmer through the Telegram bot.
 model Farmer {
-  id                 String            @id @default(uuid())
-  organizationId     String            @map("organization_id")
+  id                   String            @id @default(uuid())
+  organizationId       String            @map("organization_id")
   /// ID assigned by the cooperative. Unique within the cooperative.
-  coopFarmerId       String            @map("coop_farmer_id")
-  collectionCenterId String?           @map("collection_center_id")
-  fullName           String?           @map("full_name")
-  phone              String?
+  coopFarmerId         String            @map("coop_farmer_id")
+  collectionCenterId   String?           @map("collection_center_id")
+  fullName             String?           @map("full_name")
+  phone                String?
   /// Numeric Telegram user ID. Set when the farmer identifies themselves in
   /// the bot with their cooperative ID.
-  telegramUserId     BigInt?           @unique @map("telegram_user_id")
-  telegramUsername   String?           @map("telegram_username")
-  language           String?
-  status             FarmerStatus      @default(PRELOADED)
-  /// `register_farmer` transaction, signed by the farmer agent.
-  registerTx         String?           @map("register_tx")
-  consentHash        String?           @map("consent_hash")
-  consentTx          String?           @map("consent_tx")
-  consentAt          DateTime?         @map("consent_at")
-  linkedAt           DateTime?         @map("linked_at")
-  createdAt          DateTime          @default(now()) @map("created_at")
-  updatedAt          DateTime          @updatedAt @map("updated_at")
-  organization       Organization      @relation(fields: [organizationId], references: [id])
-  collectionCenter   CollectionCenter? @relation(fields: [collectionCenterId], references: [id])
-  botConversation    BotConversation?
+  telegramUserId       BigInt?           @unique @map("telegram_user_id")
+  telegramUsername     String?           @map("telegram_username")
+  language             String?
+  status               FarmerStatus      @default(PRELOADED)
+  /// `register_farmer` transaction, signed by the farmer agent. It is stored
+  /// before it is sent, with its expiry, so a retry can reconcile it instead
+  /// of sending another one; `registeredAt` is set once it is confirmed.
+  registerTx           String?           @map("register_tx")
+  registerTxValidUntil DateTime?         @map("register_tx_valid_until")
+  registeredAt         DateTime?         @map("registered_at")
+  consentHash          String?           @map("consent_hash")
+  consentTx            String?           @map("consent_tx")
+  consentAt            DateTime?         @map("consent_at")
+  linkedAt             DateTime?         @map("linked_at")
+  createdAt            DateTime          @default(now()) @map("created_at")
+  updatedAt            DateTime          @updatedAt @map("updated_at")
+  organization         Organization      @relation(fields: [organizationId], references: [id])
+  collectionCenter     CollectionCenter? @relation(fields: [collectionCenterId], references: [id])
+  botConversation      BotConversation?
 
   @@unique([organizationId, coopFarmerId])
   @@map("farmers")

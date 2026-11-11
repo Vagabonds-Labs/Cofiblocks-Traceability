@@ -20,16 +20,19 @@ Every request (including `GET`) carries two headers:
 | Header | Value |
 |---|---|
 | `X-VoiceLedger-Timestamp` | Unix time in seconds when the request was signed. |
-| `X-VoiceLedger-Signature` | `sha256=` + hex of `HMAC-SHA256(secret, "<timestamp>.<raw body>")`. For `GET`, the body is empty. |
+| `X-VoiceLedger-Signature` | `sha256=` + hex of `HMAC-SHA256(secret, "<timestamp>.<METHOD>.<path>.<raw body>")`. |
 
+- `METHOD` is upper case (`POST`, `GET`). `path` is the request path exactly as sent, with the query string if any (e.g. `/api/integrations/voiceledger/events`). For `GET`, the body is empty.
+- Signing the method and the path means a captured request cannot be pointed at another route or another event.
 - Requests more than **5 minutes** away from our clock are rejected (`STALE_TIMESTAMP`), so a captured request cannot be replayed later.
 - Sign the exact bytes you send. Example in Node.js:
 
   ```js
+  const path = '/api/integrations/voiceledger/events';
   const body = JSON.stringify(event);
   const timestamp = String(Math.floor(Date.now() / 1000));
   const signature = 'sha256=' + crypto.createHmac('sha256', secret)
-    .update(`${timestamp}.`).update(body).digest('hex');
+    .update(`${timestamp}.POST.${path}.`).update(body).digest('hex');
   ```
 
 - Authentication errors use HTTP `401` with `code` `MISSING_SIGNATURE`, `STALE_TIMESTAMP` or `INVALID_SIGNATURE`; `503 INTEGRATION_DISABLED` means the secret is not configured on our side.
@@ -44,6 +47,7 @@ Every event has an `event_id` chosen by VoiceLedger (a UUID is fine).
 - **Same `event_id` with a different `type` or `data`:** rejected with `409 EVENT_ID_REUSED`.
 - **A new farmer action** (for example the farmer types their ID again after a mistake) needs a **new** `event_id`.
 - Business errors (4xx) are final for that `event_id`. Server errors (5xx) are retried when the same `event_id` arrives again.
+- `503 REGISTRATION_PENDING` means the on-chain transaction was sent but is not confirmed yet: retry the same `event_id` a minute later. We never send a second transaction for it while the first one may still land.
 - If two copies arrive at the same time, one is processed and the other gets `202` with `"status": "processing"`; check `GET …/events/{event_id}` a few seconds later.
 
 ## Envelope

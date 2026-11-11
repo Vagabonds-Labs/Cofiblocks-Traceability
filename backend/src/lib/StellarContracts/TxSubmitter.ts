@@ -1,4 +1,4 @@
-import { Keypair, rpc, StrKey, Transaction, TransactionBuilder } from '@stellar/stellar-sdk';
+import { FeeBumpTransaction, Keypair, rpc, StrKey, Transaction, TransactionBuilder } from '@stellar/stellar-sdk';
 
 import { HttpException } from '@/exceptions/HttpException';
 import { logger } from '@/lib/logger';
@@ -55,6 +55,16 @@ export class TxSubmitter {
       return this.send(inner.toXDR());
     }
 
+    return this.send(this.wrapInFeeBump(inner).toXDR());
+  }
+
+  /**
+   * Wraps a signed transaction in a fee-bump paid and signed by the admin.
+   *
+   * Exposed so a caller can learn the final hash (the fee-bump's) before
+   * submitting, store it, and later find out how the submission ended.
+   */
+  public wrapInFeeBump(inner: Transaction): FeeBumpTransaction {
     const feeBump = TransactionBuilder.buildFeeBumpTransaction(
       this.client.getServiceKeypair(),
       FEE_BUMP_BASE_FEE,
@@ -62,8 +72,12 @@ export class TxSubmitter {
       this.client.networkPassphrase
     );
     feeBump.sign(this.client.getServiceKeypair());
+    return feeBump;
+  }
 
-    return this.send(feeBump.toXDR());
+  /** Submits an already signed envelope (for example from `wrapInFeeBump`). */
+  public submitEnvelope(tx: Transaction | FeeBumpTransaction): Promise<SubmittedTransaction> {
+    return this.send(tx.toXDR());
   }
 
   /**

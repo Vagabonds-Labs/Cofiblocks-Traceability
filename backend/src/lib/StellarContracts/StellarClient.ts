@@ -2,6 +2,9 @@ import { Horizon, Keypair, NotFoundError, rpc } from '@stellar/stellar-sdk';
 
 import { getDeployment, NetworkDeployment } from './deployments';
 
+/** Safety margin after a transaction's `maxTime` before it counts as expired. */
+const EXPIRY_MARGIN_MS = 30_000;
+
 /**
  * Single access point to the network: Soroban RPC, Horizon and the account the
  * backend signs with (role assignment and fee-bumps).
@@ -91,6 +94,32 @@ export class StellarClient {
 			if (error instanceof NotFoundError) return null;
 			throw error;
 		}
+	}
+
+	/**
+	 * How a submitted transaction ended, as Horizon sees it.
+	 *
+	 * `unknown` means Horizon has no record of it: it may still land, or it may
+	 * never land. It is NOT a failure. Only after its time bounds have passed
+	 * (see `hasSurelyExpired`) can a missing transaction be treated as one that
+	 * will never land.
+	 */
+	public async getTransactionOutcome(hash: string): Promise<'success' | 'failed' | 'unknown'> {
+		try {
+			const tx = await this.getHorizon().transactions().transaction(hash).call();
+			return tx.successful ? 'success' : 'failed';
+		} catch (error) {
+			if (error instanceof NotFoundError) return 'unknown';
+			throw error;
+		}
+	}
+
+	/**
+	 * `true` once a transaction valid until `validUntil` can no longer land.
+	 * Ledger close times lag the wall clock slightly, so this waits a margin.
+	 */
+	public static hasSurelyExpired(validUntil: Date | null): boolean {
+		return !!validUntil && validUntil.getTime() + EXPIRY_MARGIN_MS < Date.now();
 	}
 
 	/** Horizon is needed for classic balances and trustlines; the RPC does not expose them. */

@@ -19,14 +19,23 @@ export const VOICELEDGER_SIGNATURE_HEADER = 'x-voiceledger-signature';
 export const VOICELEDGER_MAX_SKEW_SECONDS = 5 * 60;
 
 /**
- * `sha256=<hex>` of `HMAC-SHA256(secret, "<timestamp>.<raw body>")`.
+ * `sha256=<hex>` of `HMAC-SHA256(secret, "<timestamp>.<METHOD>.<path>.<raw body>")`.
  *
- * Same scheme as Stripe's webhooks: the timestamp is part of what is signed,
- * so a captured message cannot be replayed once it is stale.
+ * - The timestamp is signed, so a captured request cannot be replayed once it
+ *   is stale.
+ * - The method and the path (with its query string, exactly as requested) are
+ *   signed, so a captured request cannot be pointed at another route or
+ *   another event. For `GET` the body is empty.
  */
-export function signVoiceLedgerPayload(secret: string, timestamp: string, body: Buffer | string): string {
+export function signVoiceLedgerPayload(
+  secret: string,
+  timestamp: string,
+  method: string,
+  path: string,
+  body: Buffer | string
+): string {
   const hmac = createHmac('sha256', secret);
-  hmac.update(`${timestamp}.`);
+  hmac.update(`${timestamp}.${method.toUpperCase()}.${path}.`);
   hmac.update(body);
   return `sha256=${hmac.digest('hex')}`;
 }
@@ -55,7 +64,9 @@ export function verifyVoiceLedgerSignature(req: Request, _res: Response, next: N
     return next(new HttpException(401, 'The signature timestamp is missing or too old', 'STALE_TIMESTAMP'));
   }
 
-  const expected = Buffer.from(signVoiceLedgerPayload(secret, timestamp, req.rawBody ?? Buffer.alloc(0)));
+  const expected = Buffer.from(
+    signVoiceLedgerPayload(secret, timestamp, req.method, req.originalUrl, req.rawBody ?? Buffer.alloc(0))
+  );
   const received = Buffer.from(signature);
   if (expected.length !== received.length || !timingSafeEqual(expected, received)) {
     return next(new HttpException(401, 'Invalid VoiceLedger signature', 'INVALID_SIGNATURE'));

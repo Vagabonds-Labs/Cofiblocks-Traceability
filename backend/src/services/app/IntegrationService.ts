@@ -22,8 +22,13 @@ export interface IntegrationResponse {
 
 type Handler = (data: Record<string, unknown>) => Promise<Record<string, unknown>>;
 
-const HANDLERS: Record<string, Handler> = {
-  'farmer.linked': async (data) => {
+/**
+ * Event handlers. A `Map`, not an object literal: looking up an arbitrary
+ * `type` in a plain object also finds inherited members (`toString`,
+ * `constructor`…), which would run as if they were handlers.
+ */
+const HANDLERS = new Map<string, Handler>([
+  ['farmer.linked', async (data) => {
     const parsed = farmerLinkedSchema.safeParse(data);
     if (!parsed.success) {
       throw new HttpException(400, 'Invalid farmer.linked data', 'INVALID_PAYLOAD', parsed.error.issues);
@@ -36,8 +41,8 @@ const HANDLERS: Record<string, Handler> = {
       language: parsed.data.language,
     });
     return { ...result };
-  },
-};
+  }],
+]);
 
 /** JSON with sorted keys, so the same content always serializes the same way. */
 function canonicalJson(value: unknown): string {
@@ -141,7 +146,7 @@ export async function receiveVoiceLedgerEvent(payload: unknown): Promise<Integra
   let response: IntegrationResponse;
   let txHash: string | null = null;
   try {
-    const handler = HANDLERS[type];
+    const handler = HANDLERS.get(type);
     if (!handler) {
       throw UPCOMING_EVENTS.has(type)
         ? new HttpException(422, `${type} is not supported yet`, 'UNSUPPORTED_EVENT')
