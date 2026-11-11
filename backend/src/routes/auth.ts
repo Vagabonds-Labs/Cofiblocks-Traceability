@@ -17,6 +17,7 @@ import * as NonceService from '@/services/app/NonceService';
 import * as UsersService from '@/services/app/UsersService';
 import * as NotificationsService from '@/services/app/NotificationService';
 import * as OnChainAccountsService from '@/services/onchain/OnChainAccountsService';
+import * as FaucetService from '@/services/onchain/FaucetService';
 import { successResponse } from '@/utils/formatting';
 
 const router = Router();
@@ -147,9 +148,11 @@ router.delete(
     // If we created one first, Cavos would see it as "deployed" without its
     // data and leave the user waiting to approve their device.
     if (provider !== 'cavos') {
-      OnChainAccountsService.ensureAccount(address).catch((error) => {
-        req.log.error({ error, address }, 'Could not create the user account on chain');
-      });
+      OnChainAccountsService.ensureAccount(address)
+        .then((hash) => (hash ? FaucetService.recordFriendbotFunding(user.id, hash) : undefined))
+        .catch((error) => {
+          req.log.error({ error, address }, 'Could not create the user account on chain');
+        });
     }
     
     setRefreshTokenCookie(res, tokens.refreshToken);

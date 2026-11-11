@@ -44,7 +44,17 @@ Each week ends with a **visual demo**, with real transactions on Stellar Testnet
 - [x] Web app translations to Afaan Oromoo and Amharic (draft, pending review by a native speaker).
 - [x] Cavos login (Telegram and email) instead of Privy, with Stellar wallet login still available. Tested with the real Cavos app (using its internal UUID as the App ID; the Telegram nonce bug still needs to be reported to them).
 - [x] Security fixes from the [week 1 review](week-1-review.md): required JWT secrets, session revocation by owner, live permission checks, Friendbot-only account creation on testnet, and a working Docker image.
-- [ ] Staging.
+
+**Week 1 (done early, November 10):**
+
+- [x] **v1 contract** (brought forward from week 2), with 29 tests including the 8 permission cases, deployed on testnet: [`CC4ZL3I3…TW524`](https://stellar.expert/explorer/testnet/contract/CC4ZL3I3IDG5BNBBH4XRRM2CWG6VZHJEND2SAHLCY7ISMUEWIG5TW524). `farmer_agent_set` points to `cofi-farmer-agent`; roles re-synced with `npm run chain:sync-roles`.
+- [x] **Farmer-agent wallet** in the backend: signs farmer actions, the admin pays its fees with fee-bump.
+- [x] **VoiceLedger integration:** `POST /api/integrations/voiceledger/events` with HMAC + timestamp, durable `event_id` idempotency and `farmer.linked` → `register_farmer` on chain. Contract proposal for VoiceLedger in [voiceledger-integration.md](voiceledger-integration.md).
+- [x] **Faucet:** `cofi-faucet` account, `POST /api/wallet/fund` (once per user, exactly-once with hash reconciliation), `GET /api/wallet`; Friendbot hash recorded for own wallets.
+- [x] **Web app:** `WalletCard` with address, balance and funding transaction on home and profile; Cavos account creation on first use (1-stroop `execute`).
+- [x] Review findings R7 (refresh URL), R8 (signer check), R9 (delete with role) and R10 (per-account lock, in process).
+- [ ] Check the Cavos account creation + faucet in a real browser login (needs Jonatan).
+- [ ] Staging and Supabase (postponed), together with R6 (cross-domain cookies).
 
 **Week 0 decisions:**
 

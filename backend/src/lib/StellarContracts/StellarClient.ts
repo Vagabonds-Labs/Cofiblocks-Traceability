@@ -41,6 +41,28 @@ export class StellarClient {
 	}
 
 	/**
+	 * The farmer agent: the only account the contract accepts for farmer
+	 * actions (registration, consent, profile, deliveries). Farmers have no
+	 * wallet, so the backend signs for them with this key.
+	 */
+	public getFarmerAgentKeypair(): Keypair {
+		return StellarClient.keypairFromEnv('STELLAR_FARMER_AGENT_SECRET');
+	}
+
+	/** The faucet account that sends testnet XLM to new staff wallets. */
+	public getFaucetKeypair(): Keypair {
+		return StellarClient.keypairFromEnv('STELLAR_FAUCET_SECRET');
+	}
+
+	private static keypairFromEnv(name: string): Keypair {
+		const secret = process.env[name];
+		if (!secret) {
+			throw new Error(`${name} is not set`);
+		}
+		return Keypair.fromSecret(secret);
+	}
+
+	/**
 	 * Source account for simulating reads.
 	 *
 	 * Simulation does not check the sequence or require the account to exist,

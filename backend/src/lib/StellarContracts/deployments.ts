@@ -27,7 +27,7 @@ const deployments: Record<string, NetworkDeployment> = {
     rpcUrl: 'https://soroban-testnet.stellar.org',
     Traceability: {
       contract: 'Traceability',
-      address: 'CAFZUGHOGCYW2ULV4ZN62T5EC7IPYZXTBKVCA3QUKO3QWJHQ5X6KB32Z',
+      address: 'CC4ZL3I3IDG5BNBBH4XRRM2CWG6VZHJEND2SAHLCY7ISMUEWIG5TW524',
     },
   },
   mainnet: {

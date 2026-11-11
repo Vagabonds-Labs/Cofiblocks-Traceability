@@ -88,11 +88,8 @@ export function cavosSignedMessageBytes(message: string): Buffer {
  * same address as the account; on a device approved later it is a different
  * key, added as a signer of the account.
  *
- * So besides the signature, we check that `signer` controls `address`:
- * - if they are the same address, the signature is enough;
- * - otherwise the account must exist on the network and have `signer` as a
- *   signer with enough weight. An account that does not exist yet cannot be
- *   checked, so it is rejected instead of trusting what the client says.
+ * So besides the signature, we check that `signer` controls `address` (see
+ * `assertKeyControlsAccount`).
  *
  * `loadAccount` returns the account as Horizon sees it, or `null` if it does
  * not exist.
@@ -124,10 +121,33 @@ export async function verifyCavosSignature(
     throw new HttpException(401, 'Invalid signature', 'INVALID_SIGNATURE');
   }
 
-  if (signer === address) return;
+  await assertKeyControlsAccount(address, signer, loadAccount);
+}
 
+type AccountLoader = (address: string) => Promise<{
+  signers: { key: string; weight: number }[];
+  thresholds: { med_threshold: number };
+} | null>;
+
+/**
+ * Checks that `signer` can act for `address` right now.
+ *
+ * - Account already on the network: `signer` must be one of its signers with
+ *   enough weight. This applies to the account's own key too: an account can
+ *   lower that key's weight (for example after moving to other device keys or
+ *   multisig), and then a signature from it must not grant access anymore.
+ * - Account not created yet: the only key that can speak for it is the one
+ *   behind the address itself. Any other key is rejected instead of trusting
+ *   what the client says.
+ */
+export async function assertKeyControlsAccount(
+  address: string,
+  signer: string,
+  loadAccount: AccountLoader
+): Promise<void> {
   const account = await loadAccount(address);
   if (!account) {
+    if (signer === address) return;
     throw new HttpException(
       401,
       'This device key cannot be linked to the account yet. Try again from the device where the account was created.',

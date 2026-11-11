@@ -170,7 +170,6 @@
     "center_label": "Collection center",
     "role_verified": "Role verified on Stellar",
     "wallet_label": "Your account on Stellar",
-    "view_on_explorer": "View on Stellar Expert",
     "tasks_title": "Your tasks",
     "coming_soon": "Coming in week {week}",
     "admin_title": "Administration",
@@ -323,5 +322,15 @@
     "retry": "Try again",
     "copy": "Copy",
     "copied": "Copied"
+  },
+  "wallet": {
+    "label": "Your account on Stellar",
+    "loading": "Loading balance…",
+    "setting_up": "Setting up your account. This takes a few seconds…",
+    "setup_error": "We couldn't finish setting up your account.",
+    "retry": "Try again",
+    "balance": "Balance:",
+    "view_account": "View on Stellar Expert",
+    "view_funding": "View funding transaction"
   }
 }

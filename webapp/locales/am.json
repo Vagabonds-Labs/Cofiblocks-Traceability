@@ -170,7 +170,6 @@
     "center_label": "የመሰብሰቢያ ማዕከል",
     "role_verified": "ሚናው በStellar ላይ ተረጋግጧል",
     "wallet_label": "በStellar ላይ ያለዎት መለያ",
-    "view_on_explorer": "በStellar Expert ላይ ይመልከቱ",
     "tasks_title": "ተግባሮችዎ",
     "coming_soon": "በሳምንት {week} ይመጣል",
     "admin_title": "አስተዳደር",
@@ -323,5 +322,15 @@
     "retry": "እንደገና ይሞክሩ",
     "copy": "ቅዳ",
     "copied": "ተቀድቷል"
+  },
+  "wallet": {
+    "label": "በStellar ላይ ያለዎት መለያ",
+    "loading": "ቀሪ ሂሳብ በመጫን ላይ…",
+    "setting_up": "መለያዎን በማዘጋጀት ላይ ነን። ጥቂት ሰከንዶች ይወስዳል…",
+    "setup_error": "መለያዎን አዘጋጅተን መጨረስ አልቻልንም።",
+    "retry": "እንደገና ይሞክሩ",
+    "balance": "ቀሪ ሂሳብ፦",
+    "view_account": "በStellar Expert ላይ ይመልከቱ",
+    "view_funding": "የገንዘብ ማስተላለፊያ ግብይቱን ይመልከቱ"
   }
 }

@@ -170,7 +170,6 @@
     "center_label": "Centro de acopio",
     "role_verified": "Rol verificado en Stellar",
     "wallet_label": "Tu cuenta en Stellar",
-    "view_on_explorer": "Ver en Stellar Expert",
     "tasks_title": "Tus tareas",
     "coming_soon": "Llega en la semana {week}",
     "admin_title": "Administración",
@@ -323,5 +322,15 @@
     "retry": "Reintentar",
     "copy": "Copiar",
     "copied": "Copiado"
+  },
+  "wallet": {
+    "label": "Tu cuenta en Stellar",
+    "loading": "Cargando saldo…",
+    "setting_up": "Estamos preparando tu cuenta. Tarda unos segundos…",
+    "setup_error": "No pudimos terminar de preparar tu cuenta.",
+    "retry": "Reintentar",
+    "balance": "Saldo:",
+    "view_account": "Ver en Stellar Expert",
+    "view_funding": "Ver la transacción de fondeo"
   }
 }

@@ -7,17 +7,27 @@ export interface RoleGrantedEvent {
 	org: number;
 }
 
-/** topics: `["farmer_registered", account]` */
+/** topics: `["farmer_agent_set", agent]` */
+export interface FarmerAgentSetEvent {
+	agent: string;
+}
+
+/** topics: `["farmer_registered", farmer_ref]` */
 export interface FarmerRegisteredEvent {
-	account: string;
 	farmer_ref: string;
 	coop: number;
 }
 
-/** topics: `["consent_recorded", account]` */
+/** topics: `["consent_recorded", farmer_ref]` */
 export interface ConsentRecordedEvent {
-	account: string;
+	farmer_ref: string;
 	consent_hash: string;
+}
+
+/** topics: `["profile_updated", farmer_ref]` */
+export interface ProfileUpdatedEvent {
+	farmer_ref: string;
+	profile_hash: string;
 }
 
 /** topics: `["batch_created", id]` */
@@ -26,8 +36,15 @@ export interface BatchCreatedEvent {
 	farmer_ref: string;
 	coop: number;
 	collection_center: number;
+	data_hash: string;
+}
+
+/** topics: `["reception_recorded", id]` */
+export interface ReceptionRecordedEvent {
+	id: string;
+	collector: string;
 	weight_grams: string;
-	actor: string;
+	receipt_hash: string;
 	data_hash: string;
 }
 
@@ -37,6 +54,13 @@ export interface StageAdvancedEvent {
 	stage: STAGES;
 	actor: string;
 	data_hash: string;
+}
+
+/** topics: `["document_attached", id]` */
+export interface DocumentAttachedEvent {
+	id: string;
+	actor: string;
+	doc_hash: string;
 }
 
 /** Raw event, for routes that return everything uninterpreted. */

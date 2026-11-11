@@ -1,18 +1,19 @@
 use soroban_sdk::{contracterror, contracttype, Address, BytesN, String, Vec};
 
-/// An account's role within the pilot.
+/// A staff account's role within the pilot.
 ///
-/// The order matters: it is what the backend uses when serializing the role.
+/// Farmers are not staff: they have no account and act through the farmer
+/// agent. The order matters: it is what the backend uses when serializing the
+/// role.
 #[contracttype]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(u32)]
 pub enum Role {
-    Farmer = 0,
-    Collector = 1,
-    CommitteeMember = 2,
-    IndustryManager = 3,
-    StoreKeeper = 4,
-    ExportManager = 5,
+    Collector = 0,
+    CommitteeMember = 1,
+    IndustryManager = 2,
+    StoreKeeper = 3,
+    ExportManager = 4,
 }
 
 /// A batch's stage. It always moves forward (see `Stage::can_follow`).
@@ -20,14 +21,17 @@ pub enum Role {
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 #[repr(u32)]
 pub enum Stage {
-    Received = 0,
-    Washing = 1,
-    Fermentation = 2,
-    Drying = 3,
-    Storage = 4,
-    InTransportToUnion = 5,
-    PreparedWithExportableBag = 6,
-    Sold = 7,
+    /// The farmer recorded the delivery (through the farmer agent).
+    Delivered = 0,
+    /// The Collector recorded the weight and the receipt.
+    Received = 1,
+    Washing = 2,
+    Fermentation = 3,
+    Drying = 4,
+    Storage = 5,
+    InTransportToUnion = 6,
+    PreparedWithExportableBag = 7,
+    Sold = 8,
 }
 
 impl Stage {
@@ -41,10 +45,14 @@ impl Stage {
         self as u32 == next || (previous == Stage::Washing && self == Stage::Drying)
     }
 
-    /// `true` if `role` can move a batch to this stage.
+    /// `true` if `role` can move a batch to this stage with `advance_stage`.
+    ///
+    /// `Delivered` and `Received` are never reached with `advance_stage`: the
+    /// farmer agent creates the batch in `Delivered`, and `record_reception`
+    /// moves it to `Received`.
     pub fn allows(self, role: Role) -> bool {
         match self {
-            Stage::Received => role == Role::Collector,
+            Stage::Delivered | Stage::Received => false,
             Stage::Washing | Stage::Fermentation | Stage::Drying => role == Role::IndustryManager,
             Stage::Storage => role == Role::IndustryManager || role == Role::StoreKeeper,
             Stage::InTransportToUnion => role == Role::StoreKeeper,
@@ -64,16 +72,21 @@ pub struct Member {
     pub org: u32,
 }
 
-/// Link between a farmer's wallet and their pseudonymous cooperative ID.
+/// A farmer, identified only by the pseudonymous ID their cooperative gave
+/// them. There is no wallet: the farmer agent acts for them.
 #[contracttype]
 #[derive(Clone, Debug, PartialEq)]
 pub struct Farmer {
     pub farmer_ref: String,
     pub coop: u32,
-    /// Hash (SHA-256) of the EUDR consent and declarations they signed.
-    /// `None` until they sign.
+    /// Hash (SHA-256) of the EUDR consent and declarations they accepted.
+    /// `None` until they accept.
     pub consent_hash: Option<BytesN<32>>,
     pub consent_at: u64,
+    /// Hash (SHA-256) of the latest version of their farm profile and
+    /// practices. Every version is also in a `profile_updated` event.
+    pub profile_hash: Option<BytesN<32>>,
+    pub profile_at: u64,
 }
 
 /// An entry in a batch's history.
@@ -90,26 +103,30 @@ pub struct StageRecord {
 #[contracttype]
 #[derive(Clone, Debug, PartialEq)]
 pub struct Batch {
-    /// Batch number, e.g. `22-10-2026 ID123`.
+    /// Batch number, e.g. `22-10-2026 KK-ID123`.
     pub id: String,
     /// The farmer's pseudonymous ID assigned by the cooperative.
     pub farmer_ref: String,
     pub coop: u32,
     pub collection_center: u32,
-    /// Peso entregado, en gramos.
+    /// Weight recorded by the Collector, in grams. 0 until reception.
     pub weight_grams: u64,
+    /// Hash (SHA-256) of the receipt photo. `None` until reception.
+    pub receipt_hash: Option<BytesN<32>>,
     pub stage: Stage,
     pub history: Vec<StageRecord>,
+    /// Hashes (SHA-256) of the attached documents, at most `MAX_DOCUMENTS`.
+    pub documents: Vec<BytesN<32>>,
 }
 
 #[contracttype]
 #[derive(Clone)]
 pub enum DataKey {
     Admin,
+    /// The backend account that signs every farmer action.
+    FarmerAgent,
     Member(Address),
-    Farmer(Address),
-    /// `farmer_ref` → wallet, so the same ID cannot end up on two wallets.
-    FarmerRef(String),
+    Farmer(String),
     Batch(String),
 }
 
@@ -124,10 +141,10 @@ pub enum Error {
     Unauthorized = 3,
     /// The account belongs to a different cooperative than the batch.
     WrongOrganization = 4,
-    /// Registering a farmer requires `register_farmer`.
-    UseRegisterFarmer = 5,
+    /// The admin has not set the farmer agent yet.
+    FarmerAgentNotSet = 5,
     FarmerNotFound = 6,
-    /// The `farmer_ref` is already linked to another wallet.
+    /// The `farmer_ref` is already registered with another cooperative.
     FarmerRefTaken = 7,
     BatchAlreadyExists = 8,
     BatchNotFound = 9,
@@ -136,4 +153,9 @@ pub enum Error {
     InvalidWeight = 11,
     /// Empty text or longer than `MAX_ID_LEN`.
     InvalidId = 12,
+    /// The weight and receipt were already recorded for this batch.
+    ReceptionAlreadyRecorded = 13,
+    /// The batch already has `MAX_DOCUMENTS` documents.
+    TooManyDocuments = 14,
+    DocumentAlreadyAttached = 15,
 }

@@ -68,8 +68,8 @@ The current work is a 4-week sprint funded by a **Stellar Instaward** (November 
 | Week | Focus | Status |
 |---|---|---|
 | 0 (Nov 9–13) | Repo base, v0 contract on testnet, Cavos login, roles and farmer upload, languages | ✅ Nearly done |
-| 1 (Nov 16–20) | Invisible wallets with a faucet, farmer-agent wallet, VoiceLedger integration, staging | ⏳ |
-| 2 (Nov 23–27) | v1 contract with every permission and its tests, farmer deliveries and profile | ⏳ |
+| 1 (Nov 16–20) | Invisible wallets with a faucet, farmer-agent wallet, VoiceLedger integration, staging | 🟡 Code done and tested on testnet; staging and the Cavos check in a real browser pending |
+| 2 (Nov 23–27) | v1 contract with every permission and its tests, farmer deliveries and profile | 🟡 v1 contract deployed early (29 tests); deliveries and profile pending |
 | 3 (Nov 30 – Dec 4) | Web app for the full flow: weight, stages, documents, history and CSV | ⏳ |
 | 4 (Dec 7–11) | End-to-end tests, CI tests, demo and documentation | ⏳ |
 
@@ -87,13 +87,13 @@ The details (design, decisions, open questions and risks) are in [`docs/implemen
 | [`backend/`](backend/) | Express + Prisma/Postgres API. Login, roles, farmers, Stellar transactions and the VoiceLedger integration | [README](backend/README.md) |
 | [`webapp/`](webapp/) | Next.js web app for cooperative and union staff | [README](webapp/README.md) |
 | [`scripts/`](scripts/) | Stellar Testnet environment setup | `setup-testnet.sh` |
-| [`docs/`](docs/) | Implementation plan, reviews and design notes | [Plan](docs/implementation-plan.md) |
+| [`docs/`](docs/) | Implementation plan, VoiceLedger integration contract, reviews and design notes | [Plan](docs/implementation-plan.md) · [VoiceLedger](docs/voiceledger-integration.md) |
 
 ## Running it locally
 
 Requirements: Node.js 20+, Postgres (local or Supabase), Rust with the `wasm32v1-none` target and the [Stellar CLI](https://developers.stellar.org/docs/tools/cli).
 
-1. **Admin identity on testnet**, funded with Friendbot:
+1. **Backend identities on testnet** (admin, farmer agent, faucet), funded with Friendbot:
 
    ```bash
    ./scripts/setup-testnet.sh
@@ -103,7 +103,7 @@ Requirements: Node.js 20+, Postgres (local or Supabase), Rust with the `wasm32v1
 3. **Backend** at `http://localhost:4000`. See [backend/README.md](backend/README.md).
 4. **Web app** at `http://localhost:3000`. See [webapp/README.md](webapp/README.md).
 
-Contract deployed on testnet: [`CAFZUGHO…KB32Z`](https://stellar.expert/explorer/testnet/contract/CAFZUGHOGCYW2ULV4ZN62T5EC7IPYZXTBKVCA3QUKO3QWJHQ5X6KB32Z). This is v0, and it will be replaced by v1 in week 2.
+Contract deployed on testnet (v1): [`CC4ZL3I3…TW524`](https://stellar.expert/explorer/testnet/contract/CC4ZL3I3IDG5BNBBH4XRRM2CWG6VZHJEND2SAHLCY7ISMUEWIG5TW524).
 
 ## Partners
 

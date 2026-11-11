@@ -53,7 +53,15 @@ pub fn get_admin(env: &Env) -> Result<Address, Error> {
         .ok_or(Error::NotInitialized)
 }
 
-// ── miembros ──────────────────────────────────────────────────────────────
+pub fn set_farmer_agent(env: &Env, agent: &Address) {
+    env.storage().instance().set(&DataKey::FarmerAgent, agent);
+}
+
+pub fn get_farmer_agent(env: &Env) -> Option<Address> {
+    env.storage().instance().get(&DataKey::FarmerAgent)
+}
+
+// ── members ───────────────────────────────────────────────────────────────
 
 pub fn get_member(env: &Env, account: &Address) -> Option<Member> {
     get_persistent(env, &DataKey::Member(account.clone()))
@@ -69,34 +77,17 @@ pub fn remove_member(env: &Env, account: &Address) {
         .remove(&DataKey::Member(account.clone()));
 }
 
-// ── caficultores ──────────────────────────────────────────────────────────
+// ── farmers ───────────────────────────────────────────────────────────────
 
-pub fn get_farmer(env: &Env, account: &Address) -> Option<Farmer> {
-    get_persistent(env, &DataKey::Farmer(account.clone()))
+pub fn get_farmer(env: &Env, farmer_ref: &String) -> Option<Farmer> {
+    get_persistent(env, &DataKey::Farmer(farmer_ref.clone()))
 }
 
-pub fn set_farmer(env: &Env, account: &Address, farmer: &Farmer) {
-    set_persistent(env, &DataKey::Farmer(account.clone()), farmer);
+pub fn set_farmer(env: &Env, farmer: &Farmer) {
+    set_persistent(env, &DataKey::Farmer(farmer.farmer_ref.clone()), farmer);
 }
 
-pub fn remove_farmer(env: &Env, account: &Address, farmer_ref: &String) {
-    env.storage()
-        .persistent()
-        .remove(&DataKey::Farmer(account.clone()));
-    env.storage()
-        .persistent()
-        .remove(&DataKey::FarmerRef(farmer_ref.clone()));
-}
-
-pub fn get_farmer_by_ref(env: &Env, farmer_ref: &String) -> Option<Address> {
-    get_persistent(env, &DataKey::FarmerRef(farmer_ref.clone()))
-}
-
-pub fn set_farmer_ref(env: &Env, farmer_ref: &String, account: &Address) {
-    set_persistent(env, &DataKey::FarmerRef(farmer_ref.clone()), account);
-}
-
-// ── lotes ─────────────────────────────────────────────────────────────────
+// ── batches ───────────────────────────────────────────────────────────────
 
 pub fn has_batch(env: &Env, id: &String) -> bool {
     env.storage().persistent().has(&DataKey::Batch(id.clone()))

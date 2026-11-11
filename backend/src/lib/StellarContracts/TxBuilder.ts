@@ -1,6 +1,7 @@
 import {
   Account,
   Contract,
+  Keypair,
   rpc,
   Transaction,
   TransactionBuilder,
@@ -86,14 +87,26 @@ export class TxBuilder {
   }
 
   /**
-   * Write signed by the backend with its own account (role assignment, farmer
-   * linking). Returns the signed transaction, ready to submit.
+   * Write signed by the backend admin with its own account (role assignment,
+   * farmer agent). Returns the signed transaction, ready to submit.
    */
-  public async prepareAsService(
+  public prepareAsService(
     request: InvocationRequest,
     validForSeconds: number = DEFAULT_VALIDITY_SECONDS
   ): Promise<Transaction> {
-    const keypair = this.client.getServiceKeypair();
+    return this.prepareSignedBy(this.client.getServiceKeypair(), request, validForSeconds);
+  }
+
+  /**
+   * Write signed by a backend account other than the admin, such as the
+   * farmer agent. That account is the source and signs; submit it with
+   * `TxSubmitter.submitSigned` so the admin pays the fee with a fee-bump.
+   */
+  public async prepareSignedBy(
+    keypair: Keypair,
+    request: InvocationRequest,
+    validForSeconds: number = DEFAULT_VALIDITY_SECONDS
+  ): Promise<Transaction> {
     const account = await this.client.rpc.getAccount(keypair.publicKey());
     const tx = this.buildUnsigned(account, request, validForSeconds);
 

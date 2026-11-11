@@ -31,6 +31,12 @@ model User {
   collectionCenterId    String?           @map("collection_center_id")
   /// Transaction that wrote the role to the contract.
   roleTx                String?           @map("role_tx")
+  /// Testnet XLM funding (faucet for Cavos wallets, Friendbot for own
+  /// wallets). `fundTx` is stored before the payment is sent, with the
+  /// transaction's expiry; `fundedAt` is set once it is confirmed.
+  fundTx                String?           @map("fund_tx")
+  fundTxValidUntil      DateTime?         @map("fund_tx_valid_until")
+  fundedAt              DateTime?         @map("funded_at")
   organization          Organization?     @relation(fields: [organizationId], references: [id])
   collectionCenter      CollectionCenter? @relation(fields: [collectionCenterId], references: [id])
   notificationsReceived Notification[]    @relation("NotificationReceiver")
@@ -155,9 +161,7 @@ model Farmer {
   telegramUsername   String?           @map("telegram_username")
   language           String?
   status             FarmerStatus      @default(PRELOADED)
-  /// Cavos wallet, created in the Mini App.
-  walletAddress      String?           @unique @map("wallet_address")
-  /// `register_farmer` transaction.
+  /// `register_farmer` transaction, signed by the farmer agent.
   registerTx         String?           @map("register_tx")
   consentHash        String?           @map("consent_hash")
   consentTx          String?           @map("consent_tx")
@@ -189,6 +193,36 @@ model BotConversation {
   @@map("bot_conversations")
 }
 
+// ── integrations ──────────────────────────────────────────────────────────
+
+/// A message received from an integration partner (VoiceLedger's farmer bot).
+/// Stored so that retries get the same answer, a reused `eventId` with other
+/// content is rejected, and every on-chain action can be traced back to the
+/// message that caused it.
+model IntegrationEvent {
+  id          String                 @id @default(uuid())
+  /// Who sent it, e.g. `voiceledger`.
+  source      String
+  /// The sender's ID for the event; unique per source.
+  eventId     String                 @map("event_id")
+  type        String
+  /// SHA-256 of the event's type and data (canonical JSON), to detect a
+  /// reused `eventId`.
+  payloadHash String                 @map("payload_hash")
+  payload     Json
+  status      IntegrationEventStatus @default(PROCESSING)
+  /// The response returned to the sender, replayed on retries.
+  httpStatus  Int?                   @map("http_status")
+  response    Json?
+  txHash      String?                @map("tx_hash")
+  errorCode   String?                @map("error_code")
+  createdAt   DateTime               @default(now()) @map("created_at")
+  updatedAt   DateTime               @updatedAt @map("updated_at")
+
+  @@unique([source, eventId])
+  @@map("integration_events")
+}
+
 // ── enums ─────────────────────────────────────────────────────────────────
 
 /// Staff roles. The order and names follow the contract's `Role` enum
@@ -209,12 +243,18 @@ enum OrganizationKind {
 enum FarmerStatus {
   /// Loaded from the cooperative's list; has not talked to the bot yet.
   PRELOADED
-  /// Identified in the bot with their ID; registration is in progress.
+  /// Identified in the bot with their ID and registered on chain.
   LINKED
-  /// Completed registration in the bot.
+  /// Completed their farm profile in the bot.
   REGISTERED
-  /// Signed the EUDR consent in the Mini App.
+  /// Accepted the EUDR consent in the bot.
   CONSENTED
+}
+
+enum IntegrationEventStatus {
+  PROCESSING
+  SUCCEEDED
+  FAILED
 }
 
 enum NotificationLevel {

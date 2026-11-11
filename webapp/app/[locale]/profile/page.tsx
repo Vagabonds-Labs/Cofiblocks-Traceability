@@ -7,8 +7,7 @@ import Link from 'next/link'
 import { useUser } from '@/lib/providers/UserProvider'
 import { useProfileForm } from '@/hooks'
 import { ProfileForm } from '@/components/profile'
-import { ExplorerLink } from '@/components/trace'
-import { shortAddress } from '@/utils/stellar'
+import { WalletCard } from '@/components/wallet'
 
 export default function ProfilePage() {
   const t = useTranslations()
@@ -101,15 +100,7 @@ export default function ProfilePage() {
             </h2>
           </div>
           {user.walletAddress && (
-            <div className="mb-4 rounded-xl bg-[#f3f6f3] p-4">
-              <p className="text-sm text-[#5a6760]">{t('home.wallet_label')}</p>
-              <p className="mt-1 font-mono text-sm" title={user.walletAddress}>
-                {shortAddress(user.walletAddress)}
-              </p>
-              <ExplorerLink kind="account" id={user.walletAddress} className="mt-2 text-sm">
-                {t('home.view_on_explorer')}
-              </ExplorerLink>
-            </div>
+            <WalletCard address={user.walletAddress} className="mb-4 rounded-xl bg-[#f3f6f3] p-4" />
           )}
           <p className="text-sm leading-relaxed text-[#5a6760]">
             {t(isCavos ? 'profile.dashboard.access_simple' : 'profile.dashboard.access_wallet')}

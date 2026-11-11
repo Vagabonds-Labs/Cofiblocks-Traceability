@@ -7,8 +7,12 @@ import { ROLE_BY_DISCRIMINANT, STAGE_BY_DISCRIMINANT } from './types/contracts';
 import {
   BatchCreatedEvent,
   ConsentRecordedEvent,
+  DocumentAttachedEvent,
+  FarmerAgentSetEvent,
   FarmerRegisteredEvent,
+  ProfileUpdatedEvent,
   RawEvent,
+  ReceptionRecordedEvent,
   RoleGrantedEvent,
   StageAdvancedEvent,
 } from './types/events';
@@ -19,7 +23,7 @@ interface DecodedEvent {
   contractId: string;
   /** First topic: the event's readable name. */
   name: string;
-  /** Topics restantes, ya nativos. */
+  /** Remaining topics, already converted to native values. */
   keys: unknown[];
   /** Data section: a map keyed by field name. */
   data: Record<string, unknown>;
@@ -73,18 +77,28 @@ export class EventsParser {
     return this.byName('role_revoked').map((event) => ({ account: str(event.keys[0]) }));
   }
 
+  public parseFarmerAgentSet(): FarmerAgentSetEvent[] {
+    return this.byName('farmer_agent_set').map((event) => ({ agent: str(event.keys[0]) }));
+  }
+
   public parseFarmerRegistered(): FarmerRegisteredEvent[] {
     return this.byName('farmer_registered').map((event) => ({
-      account: str(event.keys[0]),
-      farmer_ref: str(event.data.farmer_ref),
+      farmer_ref: str(event.keys[0]),
       coop: Number(event.data.coop),
     }));
   }
 
   public parseConsentRecorded(): ConsentRecordedEvent[] {
     return this.byName('consent_recorded').map((event) => ({
-      account: str(event.keys[0]),
+      farmer_ref: str(event.keys[0]),
       consent_hash: bytesToHex(event.data.consent_hash),
+    }));
+  }
+
+  public parseProfileUpdated(): ProfileUpdatedEvent[] {
+    return this.byName('profile_updated').map((event) => ({
+      farmer_ref: str(event.keys[0]),
+      profile_hash: bytesToHex(event.data.profile_hash),
     }));
   }
 
@@ -94,8 +108,16 @@ export class EventsParser {
       farmer_ref: str(event.data.farmer_ref),
       coop: Number(event.data.coop),
       collection_center: Number(event.data.collection_center),
+      data_hash: bytesToHex(event.data.data_hash),
+    }));
+  }
+
+  public parseReceptionRecorded(): ReceptionRecordedEvent[] {
+    return this.byName('reception_recorded').map((event) => ({
+      id: str(event.keys[0]),
+      collector: str(event.data.collector),
       weight_grams: str(event.data.weight_grams),
-      actor: str(event.data.actor),
+      receipt_hash: bytesToHex(event.data.receipt_hash),
       data_hash: bytesToHex(event.data.data_hash),
     }));
   }
@@ -106,6 +128,14 @@ export class EventsParser {
       stage: STAGE_BY_DISCRIMINANT[Number(event.data.stage)],
       actor: str(event.data.actor),
       data_hash: bytesToHex(event.data.data_hash),
+    }));
+  }
+
+  public parseDocumentAttached(): DocumentAttachedEvent[] {
+    return this.byName('document_attached').map((event) => ({
+      id: str(event.keys[0]),
+      actor: str(event.data.actor),
+      doc_hash: bytesToHex(event.data.doc_hash),
     }));
   }
 }

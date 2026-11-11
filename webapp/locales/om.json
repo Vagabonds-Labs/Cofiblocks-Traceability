@@ -170,7 +170,6 @@
     "center_label": "Giddu-gala walitti qabaa",
     "role_verified": "Gaheen Stellar irratti mirkanaa'eera",
     "wallet_label": "Herrega keessan Stellar irratti",
-    "view_on_explorer": "Stellar Expert irratti ilaali",
     "tasks_title": "Hojiiwwan keessan",
     "coming_soon": "Torban {week} keessa dhufa",
     "admin_title": "Bulchiinsa",
@@ -323,5 +322,15 @@
     "retry": "Irra deebi'ii yaali",
     "copy": "Garagalchi",
     "copied": "Garagalfameera"
+  },
+  "wallet": {
+    "label": "Herrega keessan Stellar irratti",
+    "loading": "Haftee fe'aa jira…",
+    "setting_up": "Herrega keessan qopheessaa jirra. Sekondii muraasa fudhata…",
+    "setup_error": "Herrega keessan qopheessuu xumuruu hin dandeenye.",
+    "retry": "Irra deebi'ii yaali",
+    "balance": "Haftee:",
+    "view_account": "Stellar Expert irratti ilaali",
+    "view_funding": "Taransaakshinii maallaqa itti galchuu ilaali"
   }
 }

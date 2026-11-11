@@ -4,6 +4,8 @@ import { HttpException } from '@/exceptions/HttpException';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { parseCsv } from '@/utils/csv';
+import * as OnChainTraceabilityService from '@/services/onchain/OnChainTraceabilityService';
+import { getExplorerBaseURL } from '@/services/onchain/OnChainEnvService';
 
 /** Headers accepted by the import. Only the first two are required. */
 export const FARMER_CSV_COLUMNS = [
@@ -53,8 +55,8 @@ export function normalizeFarmerId(value: string): string {
  *
  * - It is idempotent: the key is (cooperative, ID). Uploading the same file
  *   again does not create duplicates.
- * - It never touches the Telegram link or the wallet: the farmer does that
- *   through the bot.
+ * - It never touches the Telegram link: the farmer does that through the
+ *   bot.
  * - With `dryRun` it validates everything and reports what it would do,
  *   without writing.
  * - If any row has errors nothing is written: the admin fixes the file and
@@ -303,4 +305,109 @@ export async function findFarmerByTelegramUser(telegramUserId: bigint) {
     where: { telegramUserId },
     include: { organization: true, collectionCenter: true },
   });
+}
+
+export interface IntegrationLinkResult {
+  farmer_ref: string;
+  coop_code: string;
+  /** `register_farmer` transaction, signed by the farmer agent. */
+  tx_hash: string;
+  explorer_url: string;
+  /** `true` if this Telegram account was already linked and registered. */
+  already_linked: boolean;
+}
+
+/**
+ * Links a farmer to their Telegram account from VoiceLedger's bot and
+ * registers them on chain with the farmer agent.
+ *
+ * - The link is atomic: the update only applies if the farmer is still
+ *   unlinked (or already linked to this same account), so two accounts racing
+ *   for the same ID cannot both win.
+ * - A Telegram account already linked to another farmer is never moved
+ *   automatically: that farmer is registered on chain, so the cooperative has
+ *   to resolve it.
+ * - It can be retried safely: `register_farmer` is idempotent on chain and an
+ *   existing `registerTx` is returned as is.
+ */
+export async function linkFarmerFromIntegration(params: {
+  coopCode: string;
+  farmerId: string;
+  telegramUserId: bigint;
+  telegramUsername?: string | null;
+  language?: string | null;
+}): Promise<IntegrationLinkResult> {
+  const coop = await prisma.organization.findFirst({
+    where: { code: params.coopCode.trim().toUpperCase(), kind: 'COOPERATIVE' },
+  });
+  if (!coop) {
+    throw new HttpException(404, `Unknown cooperative code ${params.coopCode}`, 'COOP_NOT_FOUND');
+  }
+
+  const coopFarmerId = normalizeFarmerId(params.farmerId);
+  const farmer = await prisma.farmer.findUnique({
+    where: { organizationId_coopFarmerId: { organizationId: coop.id, coopFarmerId } },
+  });
+  if (!farmer) {
+    throw new HttpException(404, `Farmer ID ${coopFarmerId} is not on ${coop.code}'s list`, 'FARMER_NOT_FOUND');
+  }
+
+  const other = await prisma.farmer.findUnique({ where: { telegramUserId: params.telegramUserId } });
+  if (other && other.id !== farmer.id) {
+    throw new HttpException(
+      409,
+      'This Telegram account is already linked to another farmer',
+      'TELEGRAM_ALREADY_LINKED'
+    );
+  }
+
+  const alreadyLinked = farmer.telegramUserId === params.telegramUserId;
+  try {
+    const { count } = await prisma.farmer.updateMany({
+      where: {
+        id: farmer.id,
+        OR: [{ telegramUserId: null }, { telegramUserId: params.telegramUserId }],
+      },
+      data: {
+        telegramUserId: params.telegramUserId,
+        telegramUsername: params.telegramUsername ?? farmer.telegramUsername,
+        language: params.language ?? farmer.language,
+        linkedAt: farmer.linkedAt ?? new Date(),
+        status: farmer.status === FarmerStatus.PRELOADED ? FarmerStatus.LINKED : farmer.status,
+      },
+    });
+    if (count === 0) {
+      throw new HttpException(
+        409,
+        'This farmer ID is already linked to another Telegram account',
+        'FARMER_REF_TAKEN'
+      );
+    }
+  } catch (error) {
+    // The unique index on `telegramUserId` catches a race with another farmer.
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      throw new HttpException(
+        409,
+        'This Telegram account is already linked to another farmer',
+        'TELEGRAM_ALREADY_LINKED'
+      );
+    }
+    throw error;
+  }
+
+  const farmerRef = buildFarmerRef(coop.code, coopFarmerId);
+  let txHash = farmer.registerTx;
+  if (!txHash) {
+    txHash = await OnChainTraceabilityService.registerFarmer(farmerRef, coop.chainId);
+    await prisma.farmer.update({ where: { id: farmer.id }, data: { registerTx: txHash } });
+  }
+
+  logger.info({ farmerId: farmer.id, farmerRef, txHash }, 'Linked farmer from VoiceLedger');
+  return {
+    farmer_ref: farmerRef,
+    coop_code: coop.code,
+    tx_hash: txHash,
+    explorer_url: `${getExplorerBaseURL()}/tx/${txHash}`,
+    already_linked: alreadyLinked,
+  };
 }

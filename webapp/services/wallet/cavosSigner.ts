@@ -15,6 +15,8 @@
 interface CavosSession {
   address: string;
   signXdr: (unsignedXdr: string) => Promise<string>;
+  /** Creates the account on chain if Cavos has not created it yet. */
+  ensureDeployed: (destination: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -68,6 +70,20 @@ class CavosSigner {
   async signTransaction(xdr: string, address: string): Promise<string> {
     const session = await this.requireSession(address);
     return session.signXdr(xdr);
+  }
+
+  /**
+   * Makes sure the Cavos account exists on chain.
+   *
+   * Cavos only creates the account on the first payment (`execute`), and
+   * exposes no "create only" call. So we ask it to pay 1 stroop to
+   * `destination`: Cavos creates the account (sponsored, 0 XLM) and then the
+   * payment fails because the new account has no balance. That failure is
+   * expected; the account is what we need, and our faucet funds it next.
+   */
+  async ensureDeployed(address: string, destination: string): Promise<void> {
+    const session = await this.requireSession(address);
+    await session.ensureDeployed(destination);
   }
 
   async logout(): Promise<void> {

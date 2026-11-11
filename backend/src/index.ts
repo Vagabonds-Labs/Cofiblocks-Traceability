@@ -11,6 +11,8 @@ import authRoute from './routes/auth';
 import adminRoute from './routes/admin';
 import configRoute from './routes/config';
 import organizationsRoute from './routes/organizations';
+import integrationsRoute from "./routes/integrations";
+import walletRoute from "./routes/wallet";
 import { startTelegramBot } from './bot';
 import { errorHandlerMiddleware } from './middleware/errorHandler';
 import { requestId } from './middleware/requestId';
@@ -60,7 +62,17 @@ app.use(
 
 app.options("*", cors());
 
-app.use(express.json());
+// Integration webhooks are authenticated with an HMAC of the exact body, so
+// keep the raw bytes for them.
+app.use(
+  express.json({
+    verify: (req, _res, buf) => {
+      if ((req as express.Request).originalUrl?.startsWith('/api/integrations/')) {
+        (req as express.Request).rawBody = Buffer.from(buf);
+      }
+    },
+  })
+);
 app.use(cookieParser());
 
 app.use((req, res, next) => {
@@ -86,6 +98,8 @@ app.use("/api/auth", authRoute);
 app.use("/api/admin", adminRoute);
 app.use("/api/config", configRoute);
 app.use("/api/organizations", organizationsRoute);
+app.use("/api/integrations", integrationsRoute);
+app.use("/api/wallet", walletRoute);
 
 async function main() {
   // The bot webhook is registered before the error handler.

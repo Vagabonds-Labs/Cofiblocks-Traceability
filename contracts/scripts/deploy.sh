@@ -6,11 +6,14 @@
 #
 # Writes `contracts/deployments/<network>.json`, which the backend reads to get
 # the contract address. The contract admin is the deploying identity: its
-# secret key goes in the backend's `STELLAR_ADMIN_SECRET`.
+# secret key goes in the backend's `STELLAR_ADMIN_SECRET`. After deploying it
+# sets the farmer agent (`STELLAR_FARMER_AGENT_IDENTITY`), whose secret key goes
+# in the backend's `STELLAR_FARMER_AGENT_SECRET`.
 set -euo pipefail
 
 NETWORK="${1:-testnet}"
 ADMIN="${STELLAR_ADMIN_IDENTITY:-cofi-admin}"
+AGENT="${STELLAR_FARMER_AGENT_IDENTITY:-cofi-farmer-agent}"
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUT_DIR="$ROOT/deployments"
@@ -31,9 +34,11 @@ esac
 
 NET_ARGS=(--network-passphrase "$PASSPHRASE" --rpc-url "$RPC_URL")
 ADMIN_ADDRESS="$(stellar keys address "$ADMIN")"
+AGENT_ADDRESS="$(stellar keys address "$AGENT")"
 
 echo "network    $NETWORK"
 echo "admin      $ADMIN ($ADMIN_ADDRESS)"
+echo "agent      $AGENT ($AGENT_ADDRESS)"
 echo ""
 
 echo "→ build"
@@ -49,6 +54,12 @@ CONTRACT_ID="$(stellar contract deploy \
   -- --admin "$ADMIN_ADDRESS" 2>/dev/null)"
 echo "   $CONTRACT_ID"
 
+echo "→ set_farmer_agent"
+stellar contract invoke \
+  --id "$CONTRACT_ID" \
+  --source-account "$ADMIN" "${NET_ARGS[@]}" \
+  -- set_farmer_agent --agent "$AGENT_ADDRESS" >/dev/null
+
 mkdir -p "$OUT_DIR"
 OUT="$OUT_DIR/${NETWORK}.json"
 cat > "$OUT" <<JSON
@@ -60,7 +71,8 @@ cat > "$OUT" <<JSON
     "contract": "Traceability",
     "address": "$CONTRACT_ID",
     "wasmHash": "$WASM_HASH",
-    "admin": "$ADMIN_ADDRESS"
+    "admin": "$ADMIN_ADDRESS",
+    "farmerAgent": "$AGENT_ADDRESS"
   }
 }
 JSON

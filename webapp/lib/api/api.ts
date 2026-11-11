@@ -5,7 +5,23 @@
 
 import { ApiError } from "./types";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+/**
+ * Backend origin, e.g. `http://localhost:4000` (`NEXT_PUBLIC_API_URL`). A
+ * trailing `/api` is tolerated for older configurations.
+ */
+const API_ORIGIN = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000").replace(/\/+$/, "").replace(/\/api$/, "");
+
+const isProd = process.env.NEXT_PUBLIC_ENV === "production";
+
+/**
+ * The URL for an API route. Every request goes through here, refresh
+ * included: in development the Next proxy serves `/api/*` (see
+ * `next.config.js`); in production the backend is called directly.
+ */
+function apiUrl(endpoint: string): string {
+  const path = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+  return isProd ? `${API_ORIGIN}/api${path}` : `/api${path}`;
+}
 
 /* ---------------------------------------------
    Single-flight refresh token Promise
@@ -20,7 +36,7 @@ async function refreshAccessToken(): Promise<boolean> {
 
   refreshPromise = (async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
+      const res = await fetch(apiUrl("/auth/refresh"), {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -47,19 +63,13 @@ async function refreshAccessToken(): Promise<boolean> {
    Core Request Wrapper
 ---------------------------------------------- */
 
-const isProd = process.env.NEXT_PUBLIC_ENV === "production";
-
 async function request<T>(
   endpoint: string,
   options: RequestInit = {},
   retry = false
 ): Promise<T> {
 
-  const normalizedEndpoint = endpoint.startsWith("/")
-    ? endpoint
-    : `/${endpoint}`
-
-  const url = isProd ? `${API_BASE_URL}${normalizedEndpoint}` : `/api${normalizedEndpoint}`;
+  const url = apiUrl(endpoint);
 
   const isFormData = options.body instanceof FormData;
 

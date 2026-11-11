@@ -14,9 +14,9 @@ import { useLocale, useMessages, useTranslations } from 'next-intl'
 import Link from 'next/link'
 
 import { ExplorerLink } from '@/components/trace'
+import { WalletCard } from '@/components/wallet'
 import { useUser } from '@/lib/providers/UserProvider'
 import type { User } from '@/services/auth/types'
-import { shortAddress } from '@/utils/stellar'
 
 interface Task {
   title: string
@@ -211,15 +211,10 @@ function StaffHome({ user }: { user: User }) {
         {user.walletAddress && (
           <aside className="min-w-0">
             <section className="surface-card p-5 sm:p-6" aria-labelledby="wallet-title">
-              <h2 id="wallet-title" className="text-sm text-[#5a6760]">
+              <h2 id="wallet-title" className="sr-only">
                 {t('home.wallet_label')}
               </h2>
-              <p className="mt-1 break-all font-mono text-sm" title={user.walletAddress}>
-                {shortAddress(user.walletAddress)}
-              </p>
-              <ExplorerLink kind="account" id={user.walletAddress} className="mt-3 text-sm">
-                {t('home.view_on_explorer')}
-              </ExplorerLink>
+              <WalletCard address={user.walletAddress} />
             </section>
           </aside>
         )}

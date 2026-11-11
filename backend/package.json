@@ -15,6 +15,8 @@
     "prisma:format": "prisma format",
     "postinstall": "prisma generate",
     "admin:grant": "tsx scripts/grant-admin.ts",
+    "chain:sync-roles": "tsx scripts/sync-roles.ts",
+    "voiceledger:send": "tsx scripts/voiceledger-send.ts",
     "db:seed": "tsx scripts/seed.ts"
   },
   "keywords": [],

@@ -15,14 +15,17 @@ const TRACEABILITY_ERRORS: ErrorTable = {
   2: { status: 403, code: 'NOT_A_MEMBER', message: 'The account has no role assigned on chain' },
   3: { status: 403, code: 'UNAUTHORIZED', message: 'The account role does not allow this operation' },
   4: { status: 403, code: 'WRONG_ORGANIZATION', message: 'The batch belongs to another cooperative' },
-  5: { status: 400, code: 'USE_REGISTER_FARMER', message: 'Farmers are registered with register_farmer' },
+  5: { status: 500, code: 'FARMER_AGENT_NOT_SET', message: 'The contract has no farmer agent configured' },
   6: { status: 404, code: 'FARMER_NOT_FOUND', message: 'Farmer not registered on chain' },
-  7: { status: 409, code: 'FARMER_REF_TAKEN', message: 'This farmer ID is already linked to another wallet' },
+  7: { status: 409, code: 'FARMER_REF_TAKEN', message: 'This farmer ID is already registered with another cooperative' },
   8: { status: 409, code: 'BATCH_ALREADY_EXISTS', message: 'A batch with this number already exists' },
   9: { status: 404, code: 'BATCH_NOT_FOUND', message: 'Batch not found on chain' },
   10: { status: 400, code: 'INVALID_TRANSITION', message: 'The batch cannot move to that stage from its current stage' },
   11: { status: 400, code: 'INVALID_WEIGHT', message: 'Weight must be greater than zero' },
   12: { status: 400, code: 'INVALID_ID', message: 'ID is empty or too long' },
+  13: { status: 409, code: 'RECEPTION_ALREADY_RECORDED', message: 'The weight and receipt were already recorded for this batch' },
+  14: { status: 409, code: 'TOO_MANY_DOCUMENTS', message: 'The batch already has the maximum number of documents' },
+  15: { status: 409, code: 'DOCUMENT_ALREADY_ATTACHED', message: 'This document is already attached to the batch' },
 };
 
 export type ContractKind = 'traceability';

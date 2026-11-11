@@ -1,6 +1,12 @@
 const createNextIntlPlugin = require('next-intl/plugin');
 const withNextIntl = createNextIntlPlugin('./i18n.ts');
 
+// Backend origin, e.g. http://localhost:4000. A trailing /api is tolerated,
+// same as in lib/api/api.ts, so both always build the same URLs.
+const apiOrigin = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000')
+  .replace(/\/+$/, '')
+  .replace(/\/api$/, '');
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: false,
@@ -23,7 +29,7 @@ const nextConfig = {
     return [
       {
         source: '/api/:path*',
-        destination: `${process.env.NEXT_PUBLIC_API_URL}/api/:path*`,
+        destination: `${apiOrigin}/api/:path*`,
       },
     ];
   },

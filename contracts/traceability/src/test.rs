@@ -4,32 +4,43 @@ extern crate std;
 use soroban_sdk::testutils::{Address as _, Events, Ledger, MockAuth, MockAuthInvoke};
 use soroban_sdk::{Address, BytesN, Env, Event, IntoVal, String};
 
-use crate::events::{BatchCreated, StageAdvanced};
-use crate::{Error, Role, Stage, Traceability, TraceabilityClient};
+use crate::events::{BatchCreated, FarmerRegistered, ReceptionRecorded};
+use crate::{Error, Role, Stage, Traceability, TraceabilityClient, MAX_DOCUMENTS};
 
 const COOP_A: u32 = 1;
 const COOP_B: u32 = 2;
 const UNION: u32 = 100;
 const CENTER: u32 = 11;
+const FARMER: &str = "KK-ID123";
 
 struct Setup<'a> {
     env: Env,
     admin: Address,
+    agent: Address,
     contract_id: Address,
     client: TraceabilityClient<'a>,
 }
 
 impl<'a> Setup<'a> {
+    /// Contract with an admin and a farmer agent, every auth mocked.
     fn new() -> Setup<'a> {
+        let s = Self::without_agent();
+        s.client.set_farmer_agent(&s.agent);
+        s
+    }
+
+    fn without_agent() -> Setup<'a> {
         let env = Env::default();
         env.mock_all_auths();
         env.ledger().set_timestamp(1_700_000_000);
         let admin = Address::generate(&env);
+        let agent = Address::generate(&env);
         let contract_id = env.register(Traceability, (admin.clone(),));
         Setup {
             client: TraceabilityClient::new(&env, &contract_id),
             env,
             admin,
+            agent,
             contract_id,
         }
     }
@@ -48,19 +59,50 @@ impl<'a> Setup<'a> {
         BytesN::from_array(&self.env, &[byte; 32])
     }
 
-    /// Batch received at COOP_A by a COOP_A collector.
-    fn received_batch(&self, id: &str) -> String {
-        let collector = self.staff(Role::Collector, COOP_A);
+    /// `FARMER`, registered with COOP_A.
+    fn farmer(&self) -> String {
+        let farmer_ref = self.s(FARMER);
+        self.client.register_farmer(&farmer_ref, &COOP_A);
+        farmer_ref
+    }
+
+    /// Batch delivered by `FARMER` (COOP_A).
+    fn delivered_batch(&self, id: &str) -> String {
+        let farmer_ref = self.farmer();
         let id = self.s(id);
-        self.client.create_batch(
-            &collector,
-            &id,
-            &self.s("ID123"),
-            &CENTER,
-            &45_000,
-            &self.hash(1),
-        );
+        self.client.create_batch(&id, &farmer_ref, &CENTER, &self.hash(1));
         id
+    }
+
+    /// Batch delivered and then received by a COOP_A collector.
+    fn received_batch(&self, id: &str) -> String {
+        let id = self.delivered_batch(id);
+        let collector = self.staff(Role::Collector, COOP_A);
+        self.client
+            .record_reception(&collector, &id, &45_000, &self.hash(2), &self.hash(3));
+        id
+    }
+
+    /// Clears the mocked auths and authorizes only `signer` for this call.
+    fn only<A: IntoVal<Env, soroban_sdk::Vec<soroban_sdk::Val>>>(
+        &self,
+        signer: &'a Address,
+        fn_name: &'a str,
+        args: A,
+    ) -> TraceabilityClient<'a> {
+        self.env.set_auths(&[]);
+        let args = args.into_val(&self.env);
+        let invoke = std::boxed::Box::leak(std::boxed::Box::new(MockAuthInvoke {
+            contract: std::boxed::Box::leak(std::boxed::Box::new(self.contract_id.clone())),
+            fn_name,
+            args,
+            sub_invokes: &[],
+        }));
+        let auths = std::boxed::Box::leak(std::boxed::Box::new([MockAuth {
+            address: signer,
+            invoke,
+        }]));
+        self.client.mock_auths(auths)
     }
 }
 
@@ -69,13 +111,13 @@ impl<'a> Setup<'a> {
 // ══════════════════════════════════════════════════════════════════════════
 
 #[test]
-fn constructor_guarda_el_admin() {
+fn constructor_stores_the_admin() {
     let s = Setup::new();
     assert_eq!(s.client.get_admin(), s.admin);
 }
 
 #[test]
-fn asigna_reemplaza_y_revoca_roles() {
+fn grants_replaces_and_revokes_roles() {
     let s = Setup::new();
     let account = s.staff(Role::Collector, COOP_A);
     let member = s.client.get_member(&account).unwrap();
@@ -89,360 +131,526 @@ fn asigna_reemplaza_y_revoca_roles() {
 
     s.client.revoke_role(&account);
     assert_eq!(s.client.get_member(&account), None);
+    assert_eq!(s.client.try_revoke_role(&account), Err(Ok(Error::NotAMember)));
 }
 
+/// Permission case: someone other than the admin assigns roles.
 #[test]
-fn el_rol_farmer_solo_se_asigna_con_register_farmer() {
+fn only_the_admin_assigns_roles() {
     let s = Setup::new();
-    let account = Address::generate(&s.env);
-    let result = s.client.try_grant_role(&account, &Role::Farmer, &COOP_A);
-    assert_eq!(result, Err(Ok(Error::UseRegisterFarmer)));
-}
-
-#[test]
-fn asignar_rol_exige_autorizacion_del_admin() {
-    let s = Setup::new();
-    let intruso = Address::generate(&s.env);
-    let victima = Address::generate(&s.env);
-
-    s.env.set_auths(&[]);
+    let intruder = Address::generate(&s.env);
+    let victim = Address::generate(&s.env);
     let result = s
-        .client
-        .mock_auths(&[MockAuth {
-            address: &intruso,
-            invoke: &MockAuthInvoke {
-                contract: &s.contract_id,
-                fn_name: "grant_role",
-                args: (victima.clone(), Role::ExportManager, UNION).into_val(&s.env),
-                sub_invokes: &[],
-            },
-        }])
-        .try_grant_role(&victima, &Role::ExportManager, &UNION);
+        .only(&intruder, "grant_role", (victim.clone(), Role::ExportManager, UNION))
+        .try_grant_role(&victim, &Role::ExportManager, &UNION);
     assert!(result.is_err());
-}
-
-// ══════════════════════════════════════════════════════════════════════════
-// caficultores
-// ══════════════════════════════════════════════════════════════════════════
-
-#[test]
-fn registra_al_caficultor_y_su_consentimiento() {
-    let s = Setup::new();
-    let farmer = Address::generate(&s.env);
-    s.client.register_farmer(&farmer, &s.s("ID123"), &COOP_A);
-
-    let record = s.client.get_farmer(&farmer).unwrap();
-    assert_eq!(record.farmer_ref, s.s("ID123"));
-    assert_eq!(record.coop, COOP_A);
-    assert_eq!(record.consent_hash, None);
-    assert_eq!(s.client.get_farmer_by_ref(&s.s("ID123")), Some(farmer.clone()));
-    assert_eq!(s.client.get_member(&farmer).unwrap().role, Role::Farmer);
-
-    s.client.record_consent(&farmer, &s.hash(9));
-    let record = s.client.get_farmer(&farmer).unwrap();
-    assert_eq!(record.consent_hash, Some(s.hash(9)));
-    assert_eq!(record.consent_at, 1_700_000_000);
+    assert_eq!(s.client.get_member(&victim), None);
 }
 
 #[test]
-fn el_consentimiento_lo_firma_el_caficultor() {
+fn the_farmer_agent_never_holds_a_staff_role() {
     let s = Setup::new();
-    let farmer = Address::generate(&s.env);
-    s.client.register_farmer(&farmer, &s.s("ID123"), &COOP_A);
-
-    s.env.set_auths(&[]);
-    let result = s
-        .client
-        .mock_auths(&[MockAuth {
-            address: &s.admin,
-            invoke: &MockAuthInvoke {
-                contract: &s.contract_id,
-                fn_name: "record_consent",
-                args: (farmer.clone(), s.hash(9)).into_val(&s.env),
-                sub_invokes: &[],
-            },
-        }])
-        .try_record_consent(&farmer, &s.hash(9));
-    assert!(result.is_err());
-}
-
-#[test]
-fn consentimiento_de_quien_no_es_caficultor_falla() {
-    let s = Setup::new();
-    let nadie = Address::generate(&s.env);
-    let result = s.client.try_record_consent(&nadie, &s.hash(9));
-    assert_eq!(result, Err(Ok(Error::FarmerNotFound)));
-}
-
-#[test]
-fn un_farmer_ref_no_puede_quedar_en_dos_wallets() {
-    let s = Setup::new();
-    let primera = Address::generate(&s.env);
-    let segunda = Address::generate(&s.env);
-    s.client.register_farmer(&primera, &s.s("ID123"), &COOP_A);
-
-    let result = s.client.try_register_farmer(&segunda, &s.s("ID123"), &COOP_A);
-    assert_eq!(result, Err(Ok(Error::FarmerRefTaken)));
-
-    // Re-registering the same wallet with the same ID is harmless.
-    s.client.register_farmer(&primera, &s.s("ID123"), &COOP_A);
-
-    // After revoking, the ID is free for another wallet.
-    s.client.revoke_role(&primera);
-    assert_eq!(s.client.get_farmer_by_ref(&s.s("ID123")), None);
-    s.client.register_farmer(&segunda, &s.s("ID123"), &COOP_A);
-    assert_eq!(s.client.get_farmer_by_ref(&s.s("ID123")), Some(segunda));
-}
-
-#[test]
-fn cambiar_el_farmer_ref_de_una_wallet_libera_el_anterior() {
-    let s = Setup::new();
-    let farmer = Address::generate(&s.env);
-    s.client.register_farmer(&farmer, &s.s("ID123"), &COOP_A);
-    s.client.register_farmer(&farmer, &s.s("ID456"), &COOP_A);
-
-    assert_eq!(s.client.get_farmer_by_ref(&s.s("ID123")), None);
-    assert_eq!(s.client.get_farmer_by_ref(&s.s("ID456")), Some(farmer));
-}
-
-#[test]
-fn rechaza_ids_vacios_o_demasiado_largos() {
-    let s = Setup::new();
-    let farmer = Address::generate(&s.env);
     assert_eq!(
-        s.client.try_register_farmer(&farmer, &s.s(""), &COOP_A),
-        Err(Ok(Error::InvalidId))
+        s.client.try_grant_role(&s.agent, &Role::Collector, &COOP_A),
+        Err(Ok(Error::Unauthorized))
     );
-    let largo = "x".repeat(65);
-    assert_eq!(
-        s.client.try_register_farmer(&farmer, &s.s(&largo), &COOP_A),
-        Err(Ok(Error::InvalidId))
-    );
-}
 
-// ══════════════════════════════════════════════════════════════════════════
-// lotes
-// ══════════════════════════════════════════════════════════════════════════
-
-#[test]
-fn el_collector_crea_el_lote_en_received() {
-    let s = Setup::new();
     let collector = s.staff(Role::Collector, COOP_A);
-    let id = s.s("22-10-2026 ID123");
-    s.client
-        .create_batch(&collector, &id, &s.s("ID123"), &CENTER, &45_000, &s.hash(1));
+    assert_eq!(
+        s.client.try_set_farmer_agent(&collector),
+        Err(Ok(Error::Unauthorized))
+    );
+}
 
-    // `events().all()` only returns the last invocation's events: check before reading.
+// ══════════════════════════════════════════════════════════════════════════
+// farmer agent
+// ══════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn only_the_admin_sets_the_farmer_agent() {
+    let s = Setup::new();
+    let intruder = Address::generate(&s.env);
+    let result = s
+        .only(&intruder, "set_farmer_agent", (intruder.clone(),))
+        .try_set_farmer_agent(&intruder);
+    assert!(result.is_err());
+    assert_eq!(s.client.get_farmer_agent(), Some(s.agent.clone()));
+}
+
+#[test]
+fn farmer_actions_fail_until_the_agent_is_set() {
+    let s = Setup::without_agent();
+    assert_eq!(
+        s.client.try_register_farmer(&s.s(FARMER), &COOP_A),
+        Err(Ok(Error::FarmerAgentNotSet))
+    );
+}
+
+/// Permission case: an arbitrary account creates a batch (or registers a farmer).
+#[test]
+fn farmer_actions_require_the_agent_signature() {
+    let s = Setup::new();
+    let farmer_ref = s.farmer();
+    let intruder = Address::generate(&s.env);
+
+    let result = s
+        .only(&intruder, "register_farmer", (s.s("KK-ID999"), COOP_A))
+        .try_register_farmer(&s.s("KK-ID999"), &COOP_A);
+    assert!(result.is_err());
+
+    let id = s.s("L1");
+    let result = s
+        .only(&intruder, "create_batch", (id.clone(), farmer_ref.clone(), CENTER, s.hash(1)))
+        .try_create_batch(&id, &farmer_ref, &CENTER, &s.hash(1));
+    assert!(result.is_err());
+    assert_eq!(s.client.try_get_batch(&id), Err(Ok(Error::BatchNotFound)));
+
+    // The agent itself can.
+    s.only(&s.agent, "create_batch", (id.clone(), farmer_ref.clone(), CENTER, s.hash(1)))
+        .create_batch(&id, &farmer_ref, &CENTER, &s.hash(1));
+}
+
+#[test]
+fn replacing_the_agent_locks_out_the_old_one() {
+    let s = Setup::new();
+    let old_agent = s.agent.clone();
+    let new_agent = Address::generate(&s.env);
+    s.client.set_farmer_agent(&new_agent);
+
+    let result = s
+        .only(&old_agent, "register_farmer", (s.s(FARMER), COOP_A))
+        .try_register_farmer(&s.s(FARMER), &COOP_A);
+    assert!(result.is_err());
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// farmers
+// ══════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn registers_the_farmer_their_consent_and_profile() {
+    let s = Setup::new();
+    let farmer_ref = s.s(FARMER);
+    s.client.register_farmer(&farmer_ref, &COOP_A);
+
+    let event = FarmerRegistered {
+        farmer_ref: farmer_ref.clone(),
+        coop: COOP_A,
+    };
+    let events = s.env.events().all().filter_by_contract(&s.contract_id);
+    assert_eq!(events, [event.to_xdr(&s.env, &s.contract_id)]);
+
+    s.client.record_consent(&farmer_ref, &s.hash(7));
+    s.client.set_profile(&farmer_ref, &s.hash(8));
+    s.client.set_profile(&farmer_ref, &s.hash(9));
+
+    let farmer = s.client.get_farmer(&farmer_ref).unwrap();
+    assert_eq!(farmer.coop, COOP_A);
+    assert_eq!(farmer.consent_hash, Some(s.hash(7)));
+    assert_eq!(farmer.consent_at, 1_700_000_000);
+    // The profile is editable: the latest version wins.
+    assert_eq!(farmer.profile_hash, Some(s.hash(9)));
+}
+
+#[test]
+fn registering_again_is_harmless_but_another_coop_is_rejected() {
+    let s = Setup::new();
+    let farmer_ref = s.farmer();
+    s.client.record_consent(&farmer_ref, &s.hash(7));
+
+    s.client.register_farmer(&farmer_ref, &COOP_A);
+    assert_eq!(
+        s.client.get_farmer(&farmer_ref).unwrap().consent_hash,
+        Some(s.hash(7))
+    );
+
+    assert_eq!(
+        s.client.try_register_farmer(&farmer_ref, &COOP_B),
+        Err(Ok(Error::FarmerRefTaken))
+    );
+}
+
+#[test]
+fn consent_and_profile_need_a_registered_farmer() {
+    let s = Setup::new();
+    let unknown = s.s("KK-NOPE");
+    assert_eq!(
+        s.client.try_record_consent(&unknown, &s.hash(1)),
+        Err(Ok(Error::FarmerNotFound))
+    );
+    assert_eq!(
+        s.client.try_set_profile(&unknown, &s.hash(1)),
+        Err(Ok(Error::FarmerNotFound))
+    );
+}
+
+#[test]
+fn rejects_empty_or_too_long_ids() {
+    let s = Setup::new();
+    assert_eq!(
+        s.client.try_register_farmer(&s.s(""), &COOP_A),
+        Err(Ok(Error::InvalidId))
+    );
+    let long = "X".repeat(65);
+    assert_eq!(
+        s.client.try_register_farmer(&s.s(&long), &COOP_A),
+        Err(Ok(Error::InvalidId))
+    );
+
+    let farmer_ref = s.farmer();
+    assert_eq!(
+        s.client.try_create_batch(&s.s(&long), &farmer_ref, &CENTER, &s.hash(1)),
+        Err(Ok(Error::InvalidId))
+    );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// deliveries and reception
+// ══════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn the_agent_creates_the_batch_in_delivered() {
+    let s = Setup::new();
+    let farmer_ref = s.farmer();
+    let id = s.s("01-12-2026 KK-ID123");
+    s.client.create_batch(&id, &farmer_ref, &CENTER, &s.hash(1));
+
     let event = BatchCreated {
         id: id.clone(),
-        farmer_ref: s.s("ID123"),
+        farmer_ref: farmer_ref.clone(),
         coop: COOP_A,
         collection_center: CENTER,
-        weight_grams: 45_000,
-        actor: collector.clone(),
         data_hash: s.hash(1),
     };
     let events = s.env.events().all().filter_by_contract(&s.contract_id);
     assert_eq!(events, [event.to_xdr(&s.env, &s.contract_id)]);
 
     let batch = s.client.get_batch(&id);
-    assert_eq!(batch.stage, Stage::Received);
+    assert_eq!(batch.stage, Stage::Delivered);
     assert_eq!(batch.coop, COOP_A);
-    assert_eq!(batch.collection_center, CENTER);
-    assert_eq!(batch.weight_grams, 45_000);
+    assert_eq!(batch.weight_grams, 0);
+    assert_eq!(batch.receipt_hash, None);
     assert_eq!(batch.history.len(), 1);
     let first = batch.history.get(0).unwrap();
-    assert_eq!(first.actor, collector);
+    assert_eq!(first.actor, s.agent);
     assert_eq!(first.data_hash, s.hash(1));
-    assert_eq!(first.timestamp, 1_700_000_000);
 }
 
+/// Permission case: a batch is created with an ID that already exists.
 #[test]
-fn solo_el_collector_crea_lotes() {
+fn batches_need_a_registered_farmer_and_a_unique_id() {
     let s = Setup::new();
-    for role in [
-        Role::CommitteeMember,
-        Role::IndustryManager,
-        Role::StoreKeeper,
-        Role::ExportManager,
-    ] {
-        let actor = s.staff(role, COOP_A);
-        let result = s.client.try_create_batch(
-            &actor,
-            &s.s("L1"),
-            &s.s("ID123"),
-            &CENTER,
-            &1_000,
-            &s.hash(1),
-        );
-        assert_eq!(result, Err(Ok(Error::Unauthorized)));
-    }
+    assert_eq!(
+        s.client.try_create_batch(&s.s("L1"), &s.s("KK-NOPE"), &CENTER, &s.hash(1)),
+        Err(Ok(Error::FarmerNotFound))
+    );
 
-    let sin_rol = Address::generate(&s.env);
-    let result =
-        s.client
-            .try_create_batch(&sin_rol, &s.s("L1"), &s.s("ID123"), &CENTER, &1_000, &s.hash(1));
-    assert_eq!(result, Err(Ok(Error::NotAMember)));
+    let id = s.delivered_batch("L1");
+    assert_eq!(
+        s.client.try_create_batch(&id, &s.s(FARMER), &CENTER, &s.hash(9)),
+        Err(Ok(Error::BatchAlreadyExists))
+    );
+    // The original delivery is untouched.
+    assert_eq!(s.client.get_batch(&id).history.get(0).unwrap().data_hash, s.hash(1));
 }
 
 #[test]
-fn no_se_repite_el_numero_de_lote_ni_se_aceptan_cero_gramos() {
+fn the_collector_records_weight_and_receipt() {
+    let s = Setup::new();
+    let id = s.delivered_batch("L1");
+    let collector = s.staff(Role::Collector, COOP_A);
+    s.client
+        .record_reception(&collector, &id, &45_000, &s.hash(2), &s.hash(3));
+
+    let event = ReceptionRecorded {
+        id: id.clone(),
+        collector: collector.clone(),
+        weight_grams: 45_000,
+        receipt_hash: s.hash(2),
+        data_hash: s.hash(3),
+    };
+    let events = s.env.events().all().filter_by_contract(&s.contract_id);
+    assert_eq!(events, [event.to_xdr(&s.env, &s.contract_id)]);
+
+    let batch = s.client.get_batch(&id);
+    assert_eq!(batch.stage, Stage::Received);
+    assert_eq!(batch.weight_grams, 45_000);
+    assert_eq!(batch.receipt_hash, Some(s.hash(2)));
+    assert_eq!(batch.history.len(), 2);
+    assert_eq!(batch.history.get(1).unwrap().actor, collector);
+}
+
+/// Permission case: the weight is recorded twice.
+#[test]
+fn the_weight_is_recorded_only_once() {
     let s = Setup::new();
     let id = s.received_batch("L1");
     let collector = s.staff(Role::Collector, COOP_A);
-    let repetido =
+    assert_eq!(
         s.client
-            .try_create_batch(&collector, &id, &s.s("ID123"), &CENTER, &1_000, &s.hash(1));
-    assert_eq!(repetido, Err(Ok(Error::BatchAlreadyExists)));
+            .try_record_reception(&collector, &id, &1, &s.hash(4), &s.hash(5)),
+        Err(Ok(Error::ReceptionAlreadyRecorded))
+    );
+    assert_eq!(s.client.get_batch(&id).weight_grams, 45_000);
+}
 
-    let cero =
+/// Permission cases: an arbitrary account records the weight, and a Collector
+/// from another cooperative records the weight.
+#[test]
+fn only_the_batch_cooperative_collector_records_reception() {
+    let s = Setup::new();
+    let id = s.delivered_batch("L1");
+
+    let stranger = Address::generate(&s.env);
+    assert_eq!(
         s.client
-            .try_create_batch(&collector, &s.s("L2"), &s.s("ID123"), &CENTER, &0, &s.hash(1));
-    assert_eq!(cero, Err(Ok(Error::InvalidWeight)));
+            .try_record_reception(&stranger, &id, &45_000, &s.hash(2), &s.hash(3)),
+        Err(Ok(Error::NotAMember))
+    );
+
+    let other_coop = s.staff(Role::Collector, COOP_B);
+    assert_eq!(
+        s.client
+            .try_record_reception(&other_coop, &id, &45_000, &s.hash(2), &s.hash(3)),
+        Err(Ok(Error::WrongOrganization))
+    );
+
+    let industry = s.staff(Role::IndustryManager, COOP_A);
+    assert_eq!(
+        s.client
+            .try_record_reception(&industry, &id, &45_000, &s.hash(2), &s.hash(3)),
+        Err(Ok(Error::Unauthorized))
+    );
+
+    let collector = s.staff(Role::Collector, COOP_A);
+    assert_eq!(
+        s.client
+            .try_record_reception(&collector, &id, &0, &s.hash(2), &s.hash(3)),
+        Err(Ok(Error::InvalidWeight))
+    );
+    assert_eq!(s.client.get_batch(&id).stage, Stage::Delivered);
 }
 
 #[test]
-fn recorrido_completo_hasta_la_venta() {
+fn reception_requires_the_collector_signature() {
+    let s = Setup::new();
+    let id = s.delivered_batch("L1");
+    let collector = s.staff(Role::Collector, COOP_A);
+    let result = s
+        .only(
+            &s.admin,
+            "record_reception",
+            (collector.clone(), id.clone(), 45_000u64, s.hash(2), s.hash(3)),
+        )
+        .try_record_reception(&collector, &id, &45_000, &s.hash(2), &s.hash(3));
+    assert!(result.is_err());
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// stages
+// ══════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn full_journey_to_the_sale() {
     let s = Setup::new();
     let id = s.received_batch("L1");
     let industry = s.staff(Role::IndustryManager, COOP_A);
     let store = s.staff(Role::StoreKeeper, COOP_A);
     let export = s.staff(Role::ExportManager, UNION);
 
-    let pasos = [
-        (&industry, Stage::Washing),
-        (&industry, Stage::Fermentation),
-        (&industry, Stage::Drying),
-        (&store, Stage::Storage),
-        (&store, Stage::InTransportToUnion),
-        (&export, Stage::PreparedWithExportableBag),
-        (&export, Stage::Sold),
+    let steps = [
+        (Stage::Washing, &industry),
+        (Stage::Fermentation, &industry),
+        (Stage::Drying, &industry),
+        (Stage::Storage, &store),
+        (Stage::InTransportToUnion, &store),
+        (Stage::PreparedWithExportableBag, &export),
+        (Stage::Sold, &export),
     ];
-    for (i, (actor, stage)) in pasos.iter().enumerate() {
-        s.client
-            .advance_stage(actor, &id, stage, &s.hash(10 + i as u8));
+    for (i, (stage, actor)) in steps.iter().enumerate() {
+        s.client.advance_stage(actor, &id, stage, &s.hash(10 + i as u8));
     }
-
-    let last_event = StageAdvanced {
-        id: id.clone(),
-        stage: Stage::Sold,
-        actor: export.clone(),
-        data_hash: s.hash(16),
-    };
-    let events = s.env.events().all().filter_by_contract(&s.contract_id);
-    assert_eq!(events, [last_event.to_xdr(&s.env, &s.contract_id)]);
 
     let batch = s.client.get_batch(&id);
     assert_eq!(batch.stage, Stage::Sold);
-    assert_eq!(batch.history.len(), 8);
-    let last = batch.history.get(7).unwrap();
-    assert_eq!(last.stage, Stage::Sold);
-    assert_eq!(last.actor, export);
+    assert_eq!(batch.history.len(), 9);
+    assert_eq!(batch.history.get(8).unwrap().actor, export);
 }
 
+/// Permission case: a stage goes backwards or skips ahead.
 #[test]
-fn fermentation_se_puede_saltear_y_nada_mas() {
+fn fermentation_can_be_skipped_and_nothing_else() {
     let s = Setup::new();
     let id = s.received_batch("L1");
     let industry = s.staff(Role::IndustryManager, COOP_A);
 
-    // Received → Drying salta Washing: no.
-    let result = s
-        .client
-        .try_advance_stage(&industry, &id, &Stage::Drying, &s.hash(2));
-    assert_eq!(result, Err(Ok(Error::InvalidTransition)));
-
-    s.client
-        .advance_stage(&industry, &id, &Stage::Washing, &s.hash(2));
+    assert_eq!(
+        s.client.try_advance_stage(&industry, &id, &Stage::Drying, &s.hash(4)),
+        Err(Ok(Error::InvalidTransition))
+    );
+    s.client.advance_stage(&industry, &id, &Stage::Washing, &s.hash(4));
     // Washing → Drying skips Fermentation: allowed.
-    s.client
-        .advance_stage(&industry, &id, &Stage::Drying, &s.hash(3));
+    s.client.advance_stage(&industry, &id, &Stage::Drying, &s.hash(5));
 
     // No going back and no repeating a stage.
-    for stage in [Stage::Washing, Stage::Fermentation, Stage::Drying] {
-        let result = s.client.try_advance_stage(&industry, &id, &stage, &s.hash(4));
-        assert_eq!(result, Err(Ok(Error::InvalidTransition)));
-    }
+    assert_eq!(
+        s.client.try_advance_stage(&industry, &id, &Stage::Washing, &s.hash(6)),
+        Err(Ok(Error::InvalidTransition))
+    );
+    assert_eq!(
+        s.client.try_advance_stage(&industry, &id, &Stage::Drying, &s.hash(6)),
+        Err(Ok(Error::InvalidTransition))
+    );
 }
 
 #[test]
-fn cada_etapa_la_mueve_su_rol() {
+fn a_delivered_batch_must_be_received_first() {
+    let s = Setup::new();
+    let id = s.delivered_batch("L1");
+    let industry = s.staff(Role::IndustryManager, COOP_A);
+    assert_eq!(
+        s.client.try_advance_stage(&industry, &id, &Stage::Washing, &s.hash(4)),
+        Err(Ok(Error::InvalidTransition))
+    );
+
+    // `Received` is only reachable through `record_reception`.
+    let collector = s.staff(Role::Collector, COOP_A);
+    assert_eq!(
+        s.client.try_advance_stage(&collector, &id, &Stage::Received, &s.hash(4)),
+        Err(Ok(Error::Unauthorized))
+    );
+}
+
+/// Permission case: a role moves a stage that is not theirs.
+#[test]
+fn each_stage_is_moved_by_its_role() {
     let s = Setup::new();
     let id = s.received_batch("L1");
-    let collector = s.staff(Role::Collector, COOP_A);
-    let committee = s.staff(Role::CommitteeMember, COOP_A);
     let store = s.staff(Role::StoreKeeper, COOP_A);
+    let committee = s.staff(Role::CommitteeMember, COOP_A);
     let export = s.staff(Role::ExportManager, UNION);
 
-    for actor in [&collector, &committee, &store, &export] {
-        let result = s
-            .client
-            .try_advance_stage(actor, &id, &Stage::Washing, &s.hash(2));
-        assert_eq!(result, Err(Ok(Error::Unauthorized)));
+    for actor in [&store, &committee, &export] {
+        assert_eq!(
+            s.client.try_advance_stage(actor, &id, &Stage::Washing, &s.hash(4)),
+            Err(Ok(Error::Unauthorized))
+        );
     }
-
-    // A farmer cannot move batches either.
-    let farmer = Address::generate(&s.env);
-    s.client.register_farmer(&farmer, &s.s("ID123"), &COOP_A);
-    let result = s
-        .client
-        .try_advance_stage(&farmer, &id, &Stage::Washing, &s.hash(2));
-    assert_eq!(result, Err(Ok(Error::Unauthorized)));
 }
 
 #[test]
-fn storage_lo_puede_marcar_el_industry_manager() {
+fn storage_can_be_set_by_the_industry_manager() {
     let s = Setup::new();
     let id = s.received_batch("L1");
     let industry = s.staff(Role::IndustryManager, COOP_A);
-    s.client
-        .advance_stage(&industry, &id, &Stage::Washing, &s.hash(2));
-    s.client
-        .advance_stage(&industry, &id, &Stage::Drying, &s.hash(3));
-    s.client
-        .advance_stage(&industry, &id, &Stage::Storage, &s.hash(4));
+    s.client.advance_stage(&industry, &id, &Stage::Washing, &s.hash(4));
+    s.client.advance_stage(&industry, &id, &Stage::Drying, &s.hash(5));
+    s.client.advance_stage(&industry, &id, &Stage::Storage, &s.hash(6));
     assert_eq!(s.client.get_batch(&id).stage, Stage::Storage);
 }
 
 #[test]
-fn el_personal_de_otra_cooperativa_no_mueve_el_lote() {
+fn staff_from_another_cooperative_cannot_move_the_batch() {
     let s = Setup::new();
     let id = s.received_batch("L1");
-    let industry_b = s.staff(Role::IndustryManager, COOP_B);
-    let result = s
-        .client
-        .try_advance_stage(&industry_b, &id, &Stage::Washing, &s.hash(2));
-    assert_eq!(result, Err(Ok(Error::WrongOrganization)));
+    let other = s.staff(Role::IndustryManager, COOP_B);
+    assert_eq!(
+        s.client.try_advance_stage(&other, &id, &Stage::Washing, &s.hash(4)),
+        Err(Ok(Error::WrongOrganization))
+    );
 }
 
+/// Permission case: the farmer agent does something reserved for staff.
 #[test]
-fn avanzar_un_lote_inexistente_falla() {
+fn the_farmer_agent_cannot_act_as_staff() {
     let s = Setup::new();
-    let industry = s.staff(Role::IndustryManager, COOP_A);
+    let id = s.delivered_batch("L1");
+    assert_eq!(
+        s.client
+            .try_record_reception(&s.agent, &id, &45_000, &s.hash(2), &s.hash(3)),
+        Err(Ok(Error::NotAMember))
+    );
+    assert_eq!(
+        s.client.try_advance_stage(&s.agent, &id, &Stage::Washing, &s.hash(4)),
+        Err(Ok(Error::NotAMember))
+    );
+    assert_eq!(
+        s.client.try_attach_document(&s.agent, &id, &s.hash(5)),
+        Err(Ok(Error::NotAMember))
+    );
     let result = s
-        .client
-        .try_advance_stage(&industry, &s.s("no-existe"), &Stage::Washing, &s.hash(2));
-    assert_eq!(result, Err(Ok(Error::BatchNotFound)));
-}
-
-#[test]
-fn avanzar_exige_la_firma_del_actor() {
-    let s = Setup::new();
-    let id = s.received_batch("L1");
-    let industry = s.staff(Role::IndustryManager, COOP_A);
-
-    s.env.set_auths(&[]);
-    let result = s
-        .client
-        .mock_auths(&[MockAuth {
-            address: &s.admin,
-            invoke: &MockAuthInvoke {
-                contract: &s.contract_id,
-                fn_name: "advance_stage",
-                args: (industry.clone(), id.clone(), Stage::Washing, s.hash(2)).into_val(&s.env),
-                sub_invokes: &[],
-            },
-        }])
-        .try_advance_stage(&industry, &id, &Stage::Washing, &s.hash(2));
+        .only(&s.agent, "grant_role", (s.agent.clone(), Role::Collector, COOP_A))
+        .try_grant_role(&s.agent, &Role::Collector, &COOP_A);
     assert!(result.is_err());
+}
+
+#[test]
+fn advancing_a_missing_batch_fails() {
+    let s = Setup::new();
+    let industry = s.staff(Role::IndustryManager, COOP_A);
+    assert_eq!(
+        s.client.try_advance_stage(&industry, &s.s("NOPE"), &Stage::Washing, &s.hash(4)),
+        Err(Ok(Error::BatchNotFound))
+    );
+}
+
+#[test]
+fn advancing_requires_the_actor_signature() {
+    let s = Setup::new();
+    let id = s.received_batch("L1");
+    let industry = s.staff(Role::IndustryManager, COOP_A);
+    let result = s
+        .only(
+            &s.admin,
+            "advance_stage",
+            (industry.clone(), id.clone(), Stage::Washing, s.hash(4)),
+        )
+        .try_advance_stage(&industry, &id, &Stage::Washing, &s.hash(4));
+    assert!(result.is_err());
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// documents
+// ══════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn cooperative_roles_and_the_export_manager_attach_documents() {
+    let s = Setup::new();
+    let id = s.delivered_batch("L1");
+    let committee = s.staff(Role::CommitteeMember, COOP_A);
+    let export = s.staff(Role::ExportManager, UNION);
+
+    s.client.attach_document(&committee, &id, &s.hash(20));
+    s.client.attach_document(&export, &id, &s.hash(21));
+
+    let batch = s.client.get_batch(&id);
+    assert_eq!(batch.documents.len(), 2);
+    // Attaching documents does not change the stage.
+    assert_eq!(batch.stage, Stage::Delivered);
+}
+
+#[test]
+fn documents_are_scoped_unique_and_bounded() {
+    let s = Setup::new();
+    let id = s.delivered_batch("L1");
+    let other = s.staff(Role::StoreKeeper, COOP_B);
+    assert_eq!(
+        s.client.try_attach_document(&other, &id, &s.hash(20)),
+        Err(Ok(Error::WrongOrganization))
+    );
+
+    let store = s.staff(Role::StoreKeeper, COOP_A);
+    s.client.attach_document(&store, &id, &s.hash(20));
+    assert_eq!(
+        s.client.try_attach_document(&store, &id, &s.hash(20)),
+        Err(Ok(Error::DocumentAlreadyAttached))
+    );
+
+    for byte in 1..MAX_DOCUMENTS as u8 {
+        s.client.attach_document(&store, &id, &s.hash(100 + byte));
+    }
+    assert_eq!(
+        s.client.try_attach_document(&store, &id, &s.hash(250)),
+        Err(Ok(Error::TooManyDocuments))
+    );
 }

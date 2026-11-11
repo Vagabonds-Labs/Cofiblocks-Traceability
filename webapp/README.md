@@ -16,9 +16,9 @@ Next.js web app for **cooperative and union staff**: collectors, processing and 
 
 | Route | Who | What it shows |
 |---|---|---|
-| `/` | anyone | Signed out: pilot overview. Signed in: role, organization, the role's tasks and the Stellar account. |
+| `/` | anyone | Signed out: pilot overview. Signed in: role, organization, the role's tasks and the Stellar account (`WalletCard`). |
 | `/login` | signed out | Login with email or Telegram (Cavos), or with a Stellar wallet. |
-| `/profile` | session | Personal details, Stellar address and how the account is accessed. |
+| `/profile` | session | Personal details, Stellar account (`WalletCard`) and how the account is accessed. |
 | `/admin/users` | admin | Users and role assignment. Each change is written to the contract. |
 | `/admin/farmers` | admin | Upload of each cooperative's farmer list, and their status. |
 
@@ -32,6 +32,13 @@ The web app never builds transactions. The backend builds and simulates each tra
 - **Users with their own wallet:** sign with Stellar Wallets Kit (`services/wallet/walletService.ts`). If the connected wallet is not the session's wallet, signing stops before it starts.
 
 Login is signature-based too: the backend sends a nonce, the wallet signs it and the backend verifies it (`hooks/auth/useCavosLogin.ts` and `useWalletLogin.ts`).
+
+## Account setup on first use
+
+`components/wallet/WalletCard.tsx` (home and profile) shows the address, the testnet XLM balance and the funding transaction. If the account is not funded yet, `hooks/wallet/useWallet.ts` sets it up:
+
+- **Cavos:** Cavos only creates the account on its first payment and has no "create only" call. So the web app asks it to pay 1 stroop to the faucet: Cavos creates the account (sponsored, 0 XLM), the payment then fails because the new account has no balance, and the backend faucet funds it (`POST /api/wallet/fund`).
+- **Own wallet:** the backend already created it with Friendbot at login; the card waits for it.
 
 ## Layout
 

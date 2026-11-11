@@ -26,26 +26,33 @@ import {
 } from '../utils/scval';
 
 /**
- * Wrapper for the `traceability` contract.
+ * Wrapper for the `traceability` contract (v1).
  *
- * - Admin writes (roles, linking farmers) return a `Transaction` signed by the
- *   backend, ready for `TxSubmitter.submitAsService`.
- * - User writes (consent, batches, stages) return a `PreparedTransaction` with
- *   the user as the source account, for their wallet to sign and the backend
- *   to submit with fee-bump.
+ * - Admin writes (roles, farmer agent) return a `Transaction` signed by the
+ *   backend admin, ready for `TxSubmitter.submitAsService`.
+ * - Farmer writes (registration, consent, profile, deliveries) return a
+ *   `Transaction` signed by the farmer agent, ready for
+ *   `TxSubmitter.submitSigned`, which adds the admin's fee-bump.
+ * - Staff writes (reception, stages, documents) return a `PreparedTransaction`
+ *   with the staff member as the source account, for their wallet to sign and
+ *   the backend to submit with fee-bump.
  */
 export class Traceability {
 	public readonly contractAddress: string;
 
 	private readonly builder: TxBuilder;
 
-	constructor(client: StellarClient) {
+	constructor(private readonly client: StellarClient) {
 		this.contractAddress = getContractAddress(client.network, StellarContract.TRACEABILITY);
 		this.builder = new TxBuilder(client);
 	}
 
 	private call(method: string, args: xdr.ScVal[] = []) {
 		return { contractId: this.contractAddress, method, args, kind: 'traceability' as const };
+	}
+
+	private asFarmerAgent(method: string, args: xdr.ScVal[]): Promise<Transaction> {
+		return this.builder.prepareSignedBy(this.client.getFarmerAgentKeypair(), this.call(method, args));
 	}
 
 	// ── admin ───────────────────────────────────────────────────────────────
@@ -60,37 +67,54 @@ export class Traceability {
 		return this.builder.prepareAsService(this.call('revoke_role', [addressVal(account)]));
 	}
 
-	public registerFarmer(account: string, farmerRef: string, coop: number): Promise<Transaction> {
-		return this.builder.prepareAsService(
-			this.call('register_farmer', [addressVal(account), stringVal(farmerRef), u32Val(coop)])
-		);
+	public setFarmerAgent(agent: string): Promise<Transaction> {
+		return this.builder.prepareAsService(this.call('set_farmer_agent', [addressVal(agent)]));
 	}
 
-	// ── usuarios ────────────────────────────────────────────────────────────
+	// ── farmers (signed by the farmer agent) ────────────────────────────────
 
-	public recordConsent(farmer: string, consentHashHex: string): Promise<PreparedTransaction> {
-		return this.builder.prepare(
-			farmer,
-			this.call('record_consent', [addressVal(farmer), bytes32Val(consentHashHex)])
-		);
+	public registerFarmer(farmerRef: string, coop: number): Promise<Transaction> {
+		return this.asFarmerAgent('register_farmer', [stringVal(farmerRef), u32Val(coop)]);
+	}
+
+	public recordConsent(farmerRef: string, consentHashHex: string): Promise<Transaction> {
+		return this.asFarmerAgent('record_consent', [stringVal(farmerRef), bytes32Val(consentHashHex)]);
+	}
+
+	public setProfile(farmerRef: string, profileHashHex: string): Promise<Transaction> {
+		return this.asFarmerAgent('set_profile', [stringVal(farmerRef), bytes32Val(profileHashHex)]);
 	}
 
 	public createBatch(
-		actor: string,
 		id: string,
 		farmerRef: string,
 		collectionCenter: number,
+		dataHashHex: string
+	): Promise<Transaction> {
+		return this.asFarmerAgent('create_batch', [
+			stringVal(id),
+			stringVal(farmerRef),
+			u32Val(collectionCenter),
+			bytes32Val(dataHashHex),
+		]);
+	}
+
+	// ── staff (signed by their own wallet) ──────────────────────────────────
+
+	public recordReception(
+		collector: string,
+		id: string,
 		weightGrams: bigint | number,
+		receiptHashHex: string,
 		dataHashHex: string
 	): Promise<PreparedTransaction> {
 		return this.builder.prepare(
-			actor,
-			this.call('create_batch', [
-				addressVal(actor),
+			collector,
+			this.call('record_reception', [
+				addressVal(collector),
 				stringVal(id),
-				stringVal(farmerRef),
-				u32Val(collectionCenter),
 				u64Val(weightGrams),
+				bytes32Val(receiptHashHex),
 				bytes32Val(dataHashHex),
 			])
 		);
@@ -113,7 +137,14 @@ export class Traceability {
 		);
 	}
 
-	// ── lecturas ────────────────────────────────────────────────────────────
+	public attachDocument(actor: string, id: string, docHashHex: string): Promise<PreparedTransaction> {
+		return this.builder.prepare(
+			actor,
+			this.call('attach_document', [addressVal(actor), stringVal(id), bytes32Val(docHashHex)])
+		);
+	}
+
+	// ── reads ───────────────────────────────────────────────────────────────
 
 	public async getMember(account: string): Promise<OnChainMember | null> {
 		const raw = scValToNative(
@@ -123,16 +154,30 @@ export class Traceability {
 		return { role: ROLE_BY_DISCRIMINANT[Number(raw.role)], org: Number(raw.org) };
 	}
 
-	public async getFarmer(account: string): Promise<OnChainFarmer | null> {
+	public async getFarmerAgent(): Promise<string | null> {
+		const raw = scValToNative(await this.builder.read<xdr.ScVal>(this.call('get_farmer_agent')));
+		return (raw as string | null) ?? null;
+	}
+
+	public async getFarmer(farmerRef: string): Promise<OnChainFarmer | null> {
 		const raw = scValToNative(
-			await this.builder.read<xdr.ScVal>(this.call('get_farmer', [addressVal(account)]))
-		) as { farmer_ref: string; coop: number; consent_hash: Uint8Array | null; consent_at: bigint } | null;
+			await this.builder.read<xdr.ScVal>(this.call('get_farmer', [stringVal(farmerRef)]))
+		) as {
+			farmer_ref: string;
+			coop: number;
+			consent_hash: Uint8Array | null;
+			consent_at: bigint;
+			profile_hash: Uint8Array | null;
+			profile_at: bigint;
+		} | null;
 		if (!raw) return null;
 		return {
 			farmer_ref: raw.farmer_ref,
 			coop: Number(raw.coop),
 			consent_hash: raw.consent_hash ? bytesToHex(raw.consent_hash) : null,
 			consent_at: Number(raw.consent_at),
+			profile_hash: raw.profile_hash ? bytesToHex(raw.profile_hash) : null,
+			profile_at: Number(raw.profile_at),
 		};
 	}
 
@@ -145,8 +190,10 @@ export class Traceability {
 			coop: number;
 			collection_center: number;
 			weight_grams: bigint;
+			receipt_hash: Uint8Array | null;
 			stage: number;
 			history: { stage: number; actor: string; timestamp: bigint; data_hash: Uint8Array }[];
+			documents: Uint8Array[];
 		};
 		return {
 			id: raw.id,
@@ -154,6 +201,7 @@ export class Traceability {
 			coop: Number(raw.coop),
 			collection_center: Number(raw.collection_center),
 			weight_grams: raw.weight_grams.toString(),
+			receipt_hash: raw.receipt_hash ? bytesToHex(raw.receipt_hash) : null,
 			stage: STAGE_BY_DISCRIMINANT[Number(raw.stage)],
 			history: raw.history.map((record) => ({
 				stage: STAGE_BY_DISCRIMINANT[Number(record.stage)],
@@ -161,6 +209,7 @@ export class Traceability {
 				timestamp: Number(record.timestamp),
 				data_hash: bytesToHex(record.data_hash),
 			})),
+			documents: raw.documents.map((doc) => bytesToHex(doc)),
 		};
 	}
 }

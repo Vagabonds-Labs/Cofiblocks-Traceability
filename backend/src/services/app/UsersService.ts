@@ -6,7 +6,7 @@ import { logger } from '@/lib/logger';
 import { DbRefreshToken, DbSessions, DbUsers, UserEntry } from '@/services/db';
 import * as OnChainTraceabilityService from '@/services/onchain/OnChainTraceabilityService';
 import { ContractFactory } from '@/lib/StellarContracts';
-import { verifyCavosSignature, verifyStellarSignature } from '@/utils/stellarSignature';
+import { assertKeyControlsAccount, verifyCavosSignature, verifyStellarSignature } from '@/utils/stellarSignature';
 import * as NonceService from './NonceService';
 import * as NotificationService from './NotificationService';
 import { RegisterUserData, UserResponse } from './types';
@@ -30,10 +30,10 @@ export async function registerUser(
   await NonceService.consumeNonce(data.nonce, data.walletAddress);
 
   const message = NonceService.buildLoginMessage(data.nonce);
+  const client = new ContractFactory().getClient();
   if (data.walletProvider === 'cavos') {
     // Cavos signs with its own prefix and, on a device added later, with a key
     // other than the account: we have to check that it controls the account.
-    const client = new ContractFactory().getClient();
     await verifyCavosSignature(
       data.walletAddress,
       data.signer ?? data.walletAddress,
@@ -42,8 +42,12 @@ export async function registerUser(
       (address) => client.loadAccountOrNull(address)
     );
   } else {
-    // Local ed25519 verification, SEP-53 format. No network call needed.
+    // Local ed25519 verification, SEP-53 format, then a check that the key
+    // still controls the account if it already exists.
     verifyStellarSignature(data.walletAddress, message, data.signature);
+    await assertKeyControlsAccount(data.walletAddress, data.walletAddress, (address) =>
+      client.loadAccountOrNull(address)
+    );
   }
 
   const existingUser = await dbUsers.findUserByWalletAddress(data.walletAddress);
@@ -104,7 +108,24 @@ export async function updateAdminStatus(userId: string, isAdmin: boolean): Promi
   return dbUsers.updateUser(userId, { isAdmin });
 }
 
+/**
+ * Deletes a user. A user who still holds a role is refused: the role lives in
+ * the contract too, and deleting only the database row would leave that wallet
+ * able to call the contract directly. Remove the role first, which revokes it
+ * on chain.
+ */
 export async function deleteUser(userId: string): Promise<void> {
+  const user = await dbUsers.findUserById(userId);
+  if (!user) {
+    throw new HttpException(404, 'User not found', 'USER_NOT_FOUND');
+  }
+  if (user.role) {
+    throw new HttpException(
+      409,
+      'The user still has a role. Remove it first so it is also revoked on chain.',
+      'USER_HAS_ROLE'
+    );
+  }
   await dbRefreshToken.deleteRefreshTokensByUserId(userId);
   await dbSessions.markAllSessionsInactive(userId);
   await dbUsers.deleteUser(userId);

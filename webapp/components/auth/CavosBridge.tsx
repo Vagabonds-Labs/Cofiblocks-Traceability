@@ -19,6 +19,15 @@ export function CavosBridge() {
       cavosSigner.register({
         address,
         signXdr: (xdr) => wallet.signXdr(xdr),
+        ensureDeployed: async (destination) => {
+          if (wallet.isDeployed) return
+          try {
+            await wallet.execute(1n, destination)
+          } catch (error) {
+            // Expected: the account was created but has no XLM to pay with.
+            if (!wallet.isDeployed) throw error
+          }
+        },
         logout,
       })
     } else {
