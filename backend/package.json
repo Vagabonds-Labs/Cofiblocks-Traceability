@@ -18,6 +18,7 @@
     "chain:sync-roles": "tsx scripts/sync-roles.ts",
     "voiceledger:send": "tsx scripts/voiceledger-send.ts",
     "voiceledger:demo": "tsx scripts/voiceledger-demo.ts",
+    "sow:evidence": "tsx scripts/sow-evidence.ts",
     "db:seed": "tsx scripts/seed.ts"
   },
   "keywords": [],

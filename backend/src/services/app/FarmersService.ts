@@ -6,7 +6,7 @@ import { logger } from '@/lib/logger';
 import { parseCsv } from '@/utils/csv';
 import * as OnChainTraceabilityService from '@/services/onchain/OnChainTraceabilityService';
 import { getExplorerBaseURL } from '@/services/onchain/OnChainEnvService';
-import { ensureOnChain } from '@/services/onchain/ensureOnChain';
+import { asFarmerAgent, ensureOnChain } from '@/services/onchain/ensureOnChain';
 
 /** Headers accepted by the import. Only the first two are required. */
 export const FARMER_CSV_COLUMNS = [
@@ -427,7 +427,7 @@ function ensureRegisteredOnChain(
   return ensureOnChain({
     label: `register_farmer ${farmerRef}`,
     state: { tx: farmer.registerTx, txValidUntil: farmer.registerTxValidUntil, confirmedAt: farmer.registeredAt },
-    build: OnChainTraceabilityService.build.registerFarmer(farmerRef, coop),
+    send: asFarmerAgent(OnChainTraceabilityService.build.registerFarmer(farmerRef, coop)),
     claim: async (previous, hash, validUntil) => {
       const { count } = await prisma.farmer.updateMany({
         where: { id: farmer.id, registeredAt: null, registerTx: previous },

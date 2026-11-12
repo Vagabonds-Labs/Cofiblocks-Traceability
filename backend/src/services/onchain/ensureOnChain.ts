@@ -16,8 +16,13 @@ export interface ChainWrite {
   /** Short name for logs, e.g. `create_batch KK-ID001`. */
   label: string;
   state: ChainWriteState;
-  /** Builds the transaction, signed by the farmer agent (it simulates first). */
-  build: () => ReturnType<OnChainTraceabilityService.FarmerAgentBuild>;
+  /**
+   * Sends the transaction: calls `beforeSubmit` with its final hash and expiry
+   * before anything goes out, then submits it and returns the hash. Use
+   * `asFarmerAgent(build)` for farmer actions or `asStaffSigned(xdr)` for a
+   * transaction the staff member's wallet signed.
+   */
+  send: (beforeSubmit: (hash: string, validUntil: Date) => Promise<void>) => Promise<string>;
   /**
    * Stores `hash` as the record's transaction, but only if it still holds
    * `previous` and is not confirmed. Returns `false` if someone else got
@@ -32,9 +37,18 @@ export interface ChainWrite {
   pending: () => HttpException;
 }
 
+/** `send` for a farmer action: the farmer agent signs, the admin fee-bumps. */
+export function asFarmerAgent(build: OnChainTraceabilityService.FarmerAgentBuild): ChainWrite['send'] {
+  return (beforeSubmit) => OnChainTraceabilityService.submitAsFarmerAgent(build, beforeSubmit);
+}
+
+/** `send` for a transaction signed by a staff wallet: the admin fee-bumps it. */
+export function asStaffSigned(signedXdr: string): ChainWrite['send'] {
+  return (beforeSubmit) => OnChainTraceabilityService.submitStaffSigned(signedXdr, beforeSubmit);
+}
+
 /**
- * Writes a record on chain exactly once, signed by the farmer agent, and
- * returns the transaction hash.
+ * Writes a record on chain exactly once and returns the transaction hash.
  *
  * The hash is stored before sending. A later call that finds a stored hash
  * that is not confirmed asks the network how it ended instead of sending
@@ -60,7 +74,7 @@ export async function ensureOnChain(write: ChainWrite): Promise<string> {
   let sentHash: string | null = null;
   let sentValidUntil: Date | null = null;
   try {
-    const hash = await OnChainTraceabilityService.submitAsFarmerAgent(write.build, async (hash, validUntil) => {
+    const hash = await write.send(async (hash, validUntil) => {
       if (!(await write.claim(state.tx, hash, validUntil))) throw write.pending();
       sentHash = hash;
       sentValidUntil = validUntil;
@@ -79,7 +93,7 @@ export async function ensureOnChain(write: ChainWrite): Promise<string> {
   }
 }
 
-/** The 503 every farmer-agent write returns while its transaction is unconfirmed. */
+/** The 503 every write returns while its transaction is unconfirmed. */
 export function transactionPending(): HttpException {
   return new HttpException(
     503,

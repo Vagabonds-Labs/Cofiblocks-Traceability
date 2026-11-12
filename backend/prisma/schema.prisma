@@ -283,43 +283,44 @@ model Plot {
 /// A delivery of coffee by a farmer, and the batch it becomes. Its number is
 /// its on-chain ID.
 model Batch {
-  id                 String            @id @default(uuid())
+  id                    String            @id @default(uuid())
   /// On-chain batch ID: `DD-MM-YYYY <farmer_ref>`, with `/2`, `/3`… for
   /// further deliveries of the same farmer on the same day.
-  number             String            @unique
-  farmerId           String            @map("farmer_id")
-  organizationId     String            @map("organization_id")
-  collectionCenterId String            @map("collection_center_id")
-  stage              BatchStage        @default(DELIVERED)
+  number                String            @unique
+  farmerId              String            @map("farmer_id")
+  organizationId        String            @map("organization_id")
+  collectionCenterId    String            @map("collection_center_id")
+  stage                 BatchStage        @default(DELIVERED)
   /// Integration message that created it (farmer deliveries).
-  integrationEventId String?           @unique @map("integration_event_id")
+  integrationEventId    String?           @unique @map("integration_event_id")
   // Delivery, as reported by the farmer.
-  deliveredAt        DateTime          @map("delivered_at")
-  estimatedKg        Decimal?          @map("estimated_kg") @db.Decimal(10, 2)
-  ripeness           String?
-  transcript         String?
-  audioRef           String?           @map("audio_ref")
+  deliveredAt           DateTime          @map("delivered_at")
+  estimatedKg           Decimal?          @map("estimated_kg") @db.Decimal(10, 2)
+  ripeness              String?
+  transcript            String?
+  audioRef              String?           @map("audio_ref")
   /// SHA-256 of the canonical delivery record, written on chain.
-  dataHash           String            @map("data_hash")
-  createTx           String?           @map("create_tx")
-  createTxValidUntil DateTime?         @map("create_tx_valid_until")
+  dataHash              String            @map("data_hash")
+  createTx              String?           @map("create_tx")
+  createTxValidUntil    DateTime?         @map("create_tx_valid_until")
   /// Set once `create_batch` is confirmed on chain.
-  createdOnChainAt   DateTime?         @map("created_on_chain_at")
+  createdOnChainAt      DateTime?         @map("created_on_chain_at")
   // Reception (weight and receipt), recorded once by the Collector.
-  weightGrams        BigInt?           @map("weight_grams")
-  receiptHash        String?           @map("receipt_hash")
-  receptionTx        String?           @map("reception_tx")
-  receivedAt         DateTime?         @map("received_at")
-  receivedById       String?           @map("received_by_id")
-  createdAt          DateTime          @default(now()) @map("created_at")
-  updatedAt          DateTime          @updatedAt @map("updated_at")
-  farmer             Farmer            @relation(fields: [farmerId], references: [id])
-  organization       Organization      @relation(fields: [organizationId], references: [id])
-  collectionCenter   CollectionCenter  @relation(fields: [collectionCenterId], references: [id])
-  receivedBy         User?             @relation("BatchReceivedBy", fields: [receivedById], references: [id])
-  integrationEvent   IntegrationEvent? @relation(fields: [integrationEventId], references: [id])
-  events             BatchEvent[]
-  documents          Document[]
+  weightGrams           BigInt?           @map("weight_grams")
+  receiptHash           String?           @map("receipt_hash")
+  receptionTx           String?           @map("reception_tx")
+  receptionTxValidUntil DateTime?         @map("reception_tx_valid_until")
+  receivedAt            DateTime?         @map("received_at")
+  receivedById          String?           @map("received_by_id")
+  createdAt             DateTime          @default(now()) @map("created_at")
+  updatedAt             DateTime          @updatedAt @map("updated_at")
+  farmer                Farmer            @relation(fields: [farmerId], references: [id])
+  organization          Organization      @relation(fields: [organizationId], references: [id])
+  collectionCenter      CollectionCenter  @relation(fields: [collectionCenterId], references: [id])
+  receivedBy            User?             @relation("BatchReceivedBy", fields: [receivedById], references: [id])
+  integrationEvent      IntegrationEvent? @relation(fields: [integrationEventId], references: [id])
+  events                BatchEvent[]
+  documents             Document[]
 
   @@index([farmerId])
   @@index([organizationId, stage])

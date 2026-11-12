@@ -88,7 +88,7 @@ export class TxSubmitter {
    * and always sign for mainnet. On testnet that showed up as an unhelpful
    * `tx_bad_auth`; here it is recognized and explained.
    */
-  private assertSignedForThisNetwork(tx: Transaction): void {
+  public assertSignedForThisNetwork(tx: Transaction): void {
     const hash = tx.hash();
     const signers = new Set<string>(
       [tx.source, ...tx.operations.map((op) => op.source)].filter(

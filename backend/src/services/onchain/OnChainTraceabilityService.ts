@@ -1,5 +1,5 @@
 import { StaffRole } from '@prisma/client';
-import { Transaction } from '@stellar/stellar-sdk';
+import { Address, scValToNative, Transaction, TransactionBuilder, xdr } from '@stellar/stellar-sdk';
 
 import { HttpException } from '@/exceptions/HttpException';
 import { ContractFactory, DEFAULT_VALIDITY_SECONDS, EventsClient, EventsParser, StellarClient } from '@/lib/StellarContracts';
@@ -80,6 +80,119 @@ export async function submitAsFarmerAgent(
     await contracts.getTxSubmitter().submitEnvelope(envelope);
     return hash;
   });
+}
+
+/**
+ * Submits a transaction signed by a staff wallet, with the admin paying the
+ * fee (fee-bump). Like `submitAsFarmerAgent`, `beforeSubmit` gets the final
+ * hash and expiry first. Check what was signed with `assertStaffInvocation`
+ * before calling this.
+ */
+export async function submitStaffSigned(
+  signedXdr: string,
+  beforeSubmit: (hash: string, validUntil: Date) => Promise<void>
+): Promise<string> {
+  const inner = decodeSigned(signedXdr);
+  const envelope = contracts.getTxSubmitter().wrapInFeeBump(inner);
+  const hash = Buffer.from(envelope.hash()).toString('hex');
+  await beforeSubmit(hash, new Date(Number(inner.timeBounds!.maxTime) * 1000));
+  await contracts.getTxSubmitter().submitEnvelope(envelope);
+  return hash;
+}
+
+function decodeSigned(signedXdr: string): Transaction {
+  let tx: Transaction;
+  try {
+    tx = TransactionBuilder.fromXDR(signedXdr, contracts.getClient().networkPassphrase) as Transaction;
+  } catch {
+    throw new HttpException(400, 'Invalid signed transaction', 'INVALID_SIGNED_TX');
+  }
+  if (!('operations' in tx) || !tx.signatures?.length) {
+    throw new HttpException(400, 'Transaction is not signed', 'UNSIGNED_TRANSACTION');
+  }
+  if (!tx.timeBounds?.maxTime || Number(tx.timeBounds.maxTime) === 0) {
+    throw new HttpException(400, 'Transaction has no expiry', 'INVALID_SIGNED_TX');
+  }
+  contracts.getTxSubmitter().assertSignedForThisNetwork(tx);
+  return tx;
+}
+
+/**
+ * Checks that a transaction signed by a staff wallet is exactly the call the
+ * backend prepared: one `traceability` invocation, from `source`, with these
+ * method and arguments. Without this a client could sign and send something
+ * else through our fee-bump, or record a call whose off-chain record we never
+ * stored.
+ */
+export function assertStaffInvocation(signedXdr: string, source: string, method: string, args: xdr.ScVal[]): void {
+  const tx = decodeSigned(signedXdr);
+  const mismatch = (detail: string) =>
+    new HttpException(400, `The signed transaction is not the one prepared (${detail})`, 'SIGNED_TX_MISMATCH');
+
+  if (!isSameAddress(tx.source, source)) throw mismatch('source account');
+  if (tx.operations.length !== 1 || tx.operations[0].type !== 'invokeHostFunction') throw mismatch('operation');
+  const op = tx.operations[0];
+  if (op.source && !isSameAddress(op.source, source)) throw mismatch('operation source');
+  const fn = op.func;
+  if (fn.type !== 'hostFunctionTypeInvokeContract') throw mismatch('function type');
+  const call = fn.invokeContract;
+  const contractId = Address.fromScAddress(call.contractAddress).toString();
+  if (contractId !== contracts.getTraceabilityService().contractAddress) throw mismatch('contract');
+  if (call.functionName.toString() !== method) throw mismatch('method');
+  const signedArgs = call.args.map((arg: xdr.ScVal) => arg.toXDR('base64'));
+  const expected = args.map((arg) => arg.toXDR('base64'));
+  if (signedArgs.length !== expected.length || signedArgs.some((arg: string, i: number) => arg !== expected[i])) {
+    const readable = (value: unknown) =>
+      value instanceof Uint8Array ? Buffer.from(value).toString('hex') : typeof value === 'bigint' ? value.toString() : value;
+    logger.warn({ method, signed: call.args.map((a: xdr.ScVal) => readable(scValToNative(a))) }, 'Signed arguments differ');
+    throw mismatch('arguments');
+  }
+}
+
+// ── staff transactions (signed by their own wallet) ──────────────────────
+
+export function prepareReception(
+  collector: string,
+  id: string,
+  weightGrams: bigint,
+  receiptHash: string,
+  dataHash: string
+) {
+  return contracts.getTraceabilityService().recordReception(collector, id, weightGrams, receiptHash, dataHash);
+}
+
+export function verifyReceptionRecorded(
+  hash: string,
+  id: string,
+  collector: string,
+  weightGrams: bigint,
+  receiptHash: string,
+  dataHash: string
+): Promise<void> {
+  return verifyTransaction(
+    `record_reception ${id}`,
+    hash,
+    (events) =>
+      events
+        .parseReceptionRecorded()
+        .some(
+          (e) =>
+            e.id === id &&
+            isSameAddress(e.collector, collector) &&
+            e.weight_grams === weightGrams.toString() &&
+            e.receipt_hash === receiptHash &&
+            e.data_hash === dataHash
+        ),
+    async () => {
+      const batch = await findBatch(id);
+      return (
+        !!batch &&
+        batch.weight_grams === weightGrams.toString() &&
+        batch.receipt_hash === receiptHash &&
+        batch.history.some((r) => r.stage === 'RECEIVED' && isSameAddress(r.actor, collector) && r.data_hash === dataHash)
+      );
+    }
+  );
 }
 
 // ── farmer-agent transaction builders ─────────────────────────────────────

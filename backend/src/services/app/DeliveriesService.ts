@@ -14,7 +14,7 @@ import {
   requireConsent,
 } from '@/services/app/FarmerDataService';
 import * as OnChainTraceabilityService from '@/services/onchain/OnChainTraceabilityService';
-import { ensureOnChain, transactionPending } from '@/services/onchain/ensureOnChain';
+import { asFarmerAgent, ensureOnChain, transactionPending } from '@/services/onchain/ensureOnChain';
 import { sha256Canonical } from '@/utils/canonicalJson';
 
 /** The contract's limit for batch IDs. */
@@ -199,7 +199,7 @@ export async function createDelivery(ctx: IntegrationContext, data: DeliveryCrea
   const txHash = await ensureOnChain({
     label: `create_batch ${row.number}`,
     state: { tx: row.createTx, txValidUntil: row.createTxValidUntil, confirmedAt: row.createdOnChainAt },
-    build: OnChainTraceabilityService.build.createBatch(row.number, farmerRef, center.chainId, row.dataHash),
+    send: asFarmerAgent(OnChainTraceabilityService.build.createBatch(row.number, farmerRef, center.chainId, row.dataHash)),
     claim: async (previous, hash, validUntil) => {
       const { count } = await prisma.batch.updateMany({
         where: { id: row.id, createdOnChainAt: null, createTx: previous },

@@ -64,7 +64,8 @@ Each week ends with a **visual demo**, with real transactions on Stellar Testnet
 - [x] Every farmer-agent write is exactly-once with the same reconciliation as the registration (`ensureOnChain`); on-chain hashes are SHA-256 of canonical JSON and were checked against the contract.
 - [x] Simulator (`npm run voiceledger:demo -- KK ID001`) and [OpenAPI description](voiceledger-openapi.yaml). Checked on testnet on November 12: link, consent, profile v1/v2, two deliveries the same day, a retry with the same `event_id`, a refusal and the error cases.
 - [x] Provisional pilot settings in `backend/src/config/pilot.ts`: consent texts `2026-11-v1` (English draft), fachasa factor (`FACHASA_TO_HECTARES`, empty → hectares stay empty) and the pilot area box (`FARM_AREA_BBOX`).
-- [ ] SOW evidence for deliverable 2: contract on Stellar Expert and the repo with the tests.
+- [x] **SOW evidence for deliverable 2** (November 12): `npm run sow:evidence` produces the three on-chain proofs on testnet and writes [sow-evidence.md](sow-evidence.md): a farmer creates a batch (VoiceLedger API → farmer-agent wallet), a Collector records weight and receipt with their own key and our fee-bump, and two unauthorized attempts land as failed transactions with the contract's error (`#4 WRONG_ORGANIZATION`, `#13 RECEPTION_ALREADY_RECORDED`). Plus the 29 contract tests. Still to hand in to Alejandra.
+- [x] Backend side of the Collector's reception, brought forward from week 3: `ReceptionService.prepareReception` / `submitReception` (checks the signed XDR is exactly the prepared call, exactly-once with fee-bump). The HTTP endpoints and the web screen are still week 3. Migration `20261113000000_reception_tx_expiry` (to apply to Supabase).
 
 **Week 0 decisions:**
 

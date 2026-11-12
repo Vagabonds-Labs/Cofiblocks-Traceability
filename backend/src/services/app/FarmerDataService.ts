@@ -8,7 +8,7 @@ import type { FarmerConsentData, FarmerProfileData, PlotData } from '@/schemas/i
 import { buildFarmerRef } from '@/services/app/FarmersService';
 import * as OnChainTraceabilityService from '@/services/onchain/OnChainTraceabilityService';
 import { getExplorerBaseURL } from '@/services/onchain/OnChainEnvService';
-import { ensureOnChain, transactionPending } from '@/services/onchain/ensureOnChain';
+import { asFarmerAgent, ensureOnChain, transactionPending } from '@/services/onchain/ensureOnChain';
 import { sha256Canonical } from '@/utils/canonicalJson';
 
 /** What every farmer event handler receives besides its data. */
@@ -168,7 +168,7 @@ export async function recordConsent(ctx: IntegrationContext, data: FarmerConsent
   const txHash = await ensureOnChain({
     label: `record_consent ${farmerRef}`,
     state: { tx: consentRow.tx, txValidUntil: consentRow.txValidUntil, confirmedAt: consentRow.confirmedAt },
-    build: OnChainTraceabilityService.build.recordConsent(farmerRef, consentRow.consentHash),
+    send: asFarmerAgent(OnChainTraceabilityService.build.recordConsent(farmerRef, consentRow.consentHash)),
     claim: async (previous, hash, validUntil) => {
       const { count } = await prisma.farmerConsent.updateMany({
         where: { id: consentRow.id, confirmedAt: null, tx: previous },
@@ -335,7 +335,7 @@ export async function updateProfile(ctx: IntegrationContext, data: FarmerProfile
   const txHash = await ensureOnChain({
     label: `set_profile ${farmerRef} v${version.version}`,
     state: { tx: version.tx, txValidUntil: version.txValidUntil, confirmedAt: version.confirmedAt },
-    build: OnChainTraceabilityService.build.setProfile(farmerRef, version.profileHash),
+    send: asFarmerAgent(OnChainTraceabilityService.build.setProfile(farmerRef, version.profileHash)),
     claim: async (previous, hash, validUntil) => {
       const { count } = await prisma.farmerProfileVersion.updateMany({
         where: { id: version.id, confirmedAt: null, tx: previous },
