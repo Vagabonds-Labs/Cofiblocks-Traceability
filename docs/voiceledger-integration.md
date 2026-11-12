@@ -1,6 +1,6 @@
 # VoiceLedger integration — proposal
 
-> **Status:** proposal for VoiceLedger to review. `farmer.linked` is implemented and running against Stellar Testnet. `farmer.consent`, `farmer.profile` and `delivery.created` are defined here so both sides can build in parallel; our side implements them in week 2 (Nov 23–27) and returns `422 UNSUPPORTED_EVENT` until then. There is no shared environment yet: until we share a staging URL, build against this document and check your signing code with the [test vectors](#test-vectors).
+> **Status:** proposal for VoiceLedger to review. All four events (`farmer.linked`, `farmer.consent`, `farmer.profile`, `delivery.created`) are implemented on our side and run against Stellar Testnet. The consent texts, the practice questions and the area units are still provisional (see below). There is no shared environment yet: until we share a staging URL, build against this document and the [OpenAPI description](voiceledger-openapi.yaml), and check your signing code with the [test vectors](#test-vectors).
 
 ## Pilot scope
 
@@ -32,7 +32,7 @@ Telegram is the farmers' only point of contact with the system. CofiBlocks manag
 
 | Input | Status |
 |---|---|
-| Consent texts in Afaan Oromoo, Amharic and English, with their version IDs | To be sent before week 2 |
+| Consent texts in Afaan Oromoo, Amharic and English, with their version IDs | Version `2026-11-v1` drafted in English (`backend/src/config/pilot.ts`), pending review by Karla and WHH; Afaan Oromoo and Amharic still to be translated |
 | Import of the selected participants' existing data | CofiBlocks must complete this before onboarding; the workbooks contain more fields than our current importer loads |
 | Short farm questionnaire and the limited existing values needed by the bot | Based on the lists below; CofiBlocks will provide these before profile testing, without requiring a general-purpose profile lookup API |
 | Meaning and units of the existing land areas, and meaning of the coordinates | Confirm the actual area units and local conversion factor with the cooperatives, and whether these describe the coffee farm or the beneficiary's residence/total land |
@@ -241,7 +241,7 @@ Store `farmer_ref` for the Telegram account. Sending `farmer.linked` again for a
 | `TELEGRAM_ALREADY_LINKED` | 409 | This Telegram account is already linked to another farmer: the cooperative has to resolve it. |
 | `INVALID_PAYLOAD` | 400 | A field is missing or invalid (see `details`). |
 
-### `farmer.consent` — week 2
+### `farmer.consent` — implemented
 
 CofiBlocks provides the consent texts and their versions in the three languages. The bot presents them, records the farmer's explicit answer and when it was given, and sends it to us. We store it and record its hash on chain.
 
@@ -262,11 +262,35 @@ CofiBlocks provides the consent texts and their versions in the three languages.
 }
 ```
 
-- `consent_version` is the version of the text the bot showed; `answered_at` is when the farmer answered (ISO 8601).
+- `consent_version` is the version of the text the bot showed; `answered_at` is when the farmer answered (ISO 8601). We only accept versions we published; a text never changes within a version.
 - `accepted` must be an explicit answer from the farmer (a button or a clear spoken yes/no), never a default.
-- The declarations are provisional until we send the final consent texts.
+- `declarations` must contain exactly the declarations of that version (for `2026-11-v1`, the three above).
+- **Every answer is stored.** Only `accepted: true` with every declaration `true` counts as consent: it is recorded on chain and unlocks `farmer.profile` and `delivery.created`. Any other answer is stored without an on-chain write and withdraws an earlier consent, so profile and deliveries are blocked again until the farmer accepts.
+- The SHA-256 written on chain covers `farmer_ref`, `consent_version`, `language`, `accepted`, `declarations` and `answered_at`.
 
-### `farmer.profile` — week 2, limited questionnaire
+`result`:
+
+```json
+{
+  "farmer_ref": "KK-ID001",
+  "consent_version": "2026-11-v1",
+  "consented": true,
+  "consent_hash": "a2e4ef7a…3a1e",
+  "tx_hash": "b1ec79a7…3101",
+  "explorer_url": "https://stellar.expert/explorer/testnet/tx/b1ec79a7…3101"
+}
+```
+
+For a refusal, `consented` is `false` and `tx_hash` and `explorer_url` are `null`.
+
+| Error code | HTTP | Meaning for the bot |
+|---|---|---|
+| `FARMER_NOT_FOUND` | 404 | Unknown `farmer_ref`. |
+| `FARMER_NOT_LINKED` | 409 | The farmer exists but was never linked: send `farmer.linked` first. |
+| `UNKNOWN_CONSENT_VERSION` | 422 | We did not publish that version; `details.known` lists the valid ones. |
+| `INVALID_DECLARATIONS` | 400 | Missing or extra declarations for that version; `details.expected` lists them. |
+
+### `farmer.profile` — implemented, limited questionnaire
 
 > **Provisional questions.** The existing data is described above. CofiBlocks will confirm the practice questions and whether any coffee-plot information actually needs collecting before VoiceLedger builds this part of the conversation.
 
@@ -291,9 +315,41 @@ This event carries the additional farm answers or corrections, not a repeat of t
 - Each update uses a new `event_id`. Omitted top-level fields keep their existing values. If `plots` is supplied, it is the complete updated list of plots; if `practices` is supplied, it is the complete updated set of agreed practice answers. Do not send empty placeholders for information that was not collected.
 - For a newly collected or corrected point, `location.source` is `shared` (Telegram "Share location"), `typed` or `dictated`. Ask for the coffee plot's location, not the farmer's current location unless they are at the plot. CofiBlocks checks that the point falls inside Gomma woreda.
 - Send a newly collected area with its original unit, such as `fachasa` in this example. Confirm the local unit name and conversion factor with the cooperative before testing this question. CofiBlocks handles any conversion needed internally and preserves the original value and unit; the farmer is not asked to convert to hectares. Imported areas must likewise not be converted until their actual source units are confirmed.
-- The `shade_trees` and `fertilizer` fields illustrate practice answers; the final questions and answer choices will be supplied by CofiBlocks.
+- The `shade_trees` and `fertilizer` fields illustrate practice answers; the final questions and answer choices will be supplied by CofiBlocks. Until then any snake_case key with a text, number, yes/no or list-of-texts answer is accepted.
+- The farmer must have consented first (`CONSENT_REQUIRED` otherwise).
+- Each accepted message creates a new **profile version** with its own hash on chain; the version number is in the result.
 
-### `delivery.created` — week 2
+`result`:
+
+```json
+{
+  "farmer_ref": "KK-ID001",
+  "profile_version": 2,
+  "profile_hash": "68e012c1…c6b2",
+  "plots": [
+    {
+      "name": "Plot 1",
+      "size": { "value": 1.5, "unit": "fachasa" },
+      "location": { "lat": 7.86, "lng": 36.62, "source": "shared" },
+      "hectares": null
+    }
+  ],
+  "practices": { "shade_trees": true, "fertilizer": "compost" },
+  "tx_hash": "209b6236…29d1",
+  "explorer_url": "https://stellar.expert/explorer/testnet/tx/209b6236…29d1"
+}
+```
+
+The result always carries the complete current profile, so the bot can read it back to the farmer. `hectares` stays `null` until the conversion factor for the unit is confirmed.
+
+| Error code | HTTP | Meaning for the bot |
+|---|---|---|
+| `CONSENT_REQUIRED` | 409 | The farmer has not consented (or withdrew it): ask for consent first. |
+| `LOCATION_OUTSIDE_AREA` | 422 | A point falls outside the pilot area; `details` lists which plot. Ask the farmer to check the coordinates or share the location again. |
+| `FARMER_NOT_FOUND`, `FARMER_NOT_LINKED` | 404, 409 | As for `farmer.consent`. |
+| `INVALID_PAYLOAD` | 400 | Neither `plots` nor `practices`, or a field is invalid (see `details`). |
+
+### `delivery.created` — implemented
 
 The farmer delivered coffee at a collection center. The bot collects the center and the estimated quantity, reads them back, and sends the event only after the farmer confirms. We generate the batch number and record the delivery on chain. The final weight is recorded later by the cooperative staff in the CofiBlocks web app, and the farmer is told about it (see [Notifications](#notifications-back-to-voiceledger)).
 
@@ -310,9 +366,42 @@ The farmer delivered coffee at a collection center. The bot collects the center 
 
 - `collection_center` must be one of the farmer's cooperative's centers in the [reference table](#reference-data).
 - `estimated_kg` is the farmer's estimate; it is not the recorded weight.
+- `estimated_kg` above 2000 is rejected as probably misheard (`ESTIMATED_KG_TOO_HIGH`): read it back and confirm.
+- The delivery date is the envelope's `occurred_at` (Ethiopian time) if sent, otherwise when we receive it. It cannot be in the future or more than 14 days back, so a bot that queues events offline should send `occurred_at`.
+- The farmer must have consented first (`CONSENT_REQUIRED` otherwise).
 - If the answer is pending or a 5xx, follow the retry rules with the same `event_id` to avoid duplicate recording. Each separate delivery is a new event, including a second delivery on the same day.
 
-`result` will include a unique `batch_id` for the delivery, `tx_hash` and `explorer_url`. CofiBlocks generates the batch ID, including how multiple deliveries on the same day are distinguished. VoiceLedger stores and displays the returned value without constructing it or relying on its format.
+`result`:
+
+```json
+{
+  "batch_id": "24-11-2026 KK-ID001",
+  "farmer_ref": "KK-ID001",
+  "collection_center": "Kirkir",
+  "estimated_kg": 45,
+  "ripeness": "ripe",
+  "delivered_at": "2026-11-24T07:10:00.000Z",
+  "stage": "DELIVERED",
+  "data_hash": "fa4e5b1e…7ce8",
+  "tx_hash": "8cc76aea…cbcf",
+  "explorer_url": "https://stellar.expert/explorer/testnet/tx/8cc76aea…cbcf"
+}
+```
+
+CofiBlocks generates the batch ID; today it is `DD-MM-YYYY <farmer_ref>`, with `/2`, `/3`… for further deliveries of the same farmer on the same day. VoiceLedger stores and displays the returned value without constructing it or relying on its format.
+
+| Error code | HTTP | Meaning for the bot |
+|---|---|---|
+| `CONSENT_REQUIRED` | 409 | Ask for consent first. |
+| `UNKNOWN_COLLECTION_CENTER` | 422 | Not a center of the farmer's cooperative; `details.valid` lists them. |
+| `ESTIMATED_KG_TOO_HIGH` | 422 | Confirm the quantity with the farmer. |
+| `INVALID_DELIVERY_DATE` | 422 | `occurred_at` is in the future or too old. |
+| `TOO_MANY_DELIVERIES` | 422 | More than 50 deliveries of one farmer on one day: contact the cooperative. |
+| `FARMER_NOT_FOUND`, `FARMER_NOT_LINKED` | 404, 409 | As for `farmer.consent`. |
+
+### On-chain writes that are not confirmed yet
+
+`farmer.consent`, `farmer.profile` and `delivery.created` answer `503 TRANSACTION_PENDING` when their transaction was sent but is not confirmed yet (`farmer.linked` uses `503 REGISTRATION_PENDING`). Retry the same `event_id` a minute later: we never send a second transaction for it until the network proves the first one never landed.
 
 ## Notifications back to VoiceLedger
 
@@ -348,4 +437,5 @@ With our backend running, we sign and send events exactly as the bot would:
 ```bash
 npm run voiceledger:send -- farmer.linked '{"coop_code":"KK","farmer_id":"ID001","telegram_user_id":"123456789"}'
 npm run voiceledger:send -- --status <event_id>
+npm run voiceledger:demo -- KK ID001 --center Kirkir --kg 45   # the whole journey, with Stellar Expert links
 ```

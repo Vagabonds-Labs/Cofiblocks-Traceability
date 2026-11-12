@@ -6,6 +6,7 @@ import { logger } from '@/lib/logger';
 import { parseCsv } from '@/utils/csv';
 import * as OnChainTraceabilityService from '@/services/onchain/OnChainTraceabilityService';
 import { getExplorerBaseURL } from '@/services/onchain/OnChainEnvService';
+import { ensureOnChain } from '@/services/onchain/ensureOnChain';
 
 /** Headers accepted by the import. Only the first two are required. */
 export const FARMER_CSV_COLUMNS = [
@@ -417,66 +418,36 @@ function registrationPending(): HttpException {
   );
 }
 
-/**
- * Registers the farmer on chain exactly once, and returns the transaction.
- *
- * The hash is stored before sending. A later call that finds a stored hash
- * without `registeredAt` asks the network how it ended instead of sending
- * another transaction: confirmed → done; failed, or proven never to have landed
- * → send a new one; anything else → still pending (a transaction that does not
- * show up yet may have landed or still land).
- */
-async function ensureRegisteredOnChain(
+/** Registers the farmer on chain exactly once (see `ensureOnChain`), and returns the transaction. */
+function ensureRegisteredOnChain(
   farmer: { id: string; registerTx: string | null; registerTxValidUntil: Date | null; registeredAt: Date | null },
   farmerRef: string,
   coop: number
 ): Promise<string> {
-  if (farmer.registerTx && farmer.registeredAt) return farmer.registerTx;
-
-  const markRegistered = async (hash: string) => {
-    await OnChainTraceabilityService.verifyFarmerRegistered(hash, farmerRef, coop);
-    await prisma.farmer.update({
-      where: { id: farmer.id },
-      data: { registerTx: hash, registeredAt: new Date(), registerTxValidUntil: null },
-    });
-    return hash;
-  };
-
-  if (farmer.registerTx) {
-    const outcome = await OnChainTraceabilityService.getTransactionOutcome(
-      farmer.registerTx,
-      farmer.registerTxValidUntil
-    );
-    if (outcome === 'success') return markRegistered(farmer.registerTx);
-    if (outcome === 'pending') throw registrationPending();
-  }
-
-  let sentHash: string | null = null;
-  let sentValidUntil: Date | null = null;
-  try {
-    const hash = await OnChainTraceabilityService.registerFarmer(farmerRef, coop, async (hash, validUntil) => {
-      // Claim the registration: only if nobody stored another hash meanwhile.
+  return ensureOnChain({
+    label: `register_farmer ${farmerRef}`,
+    state: { tx: farmer.registerTx, txValidUntil: farmer.registerTxValidUntil, confirmedAt: farmer.registeredAt },
+    build: OnChainTraceabilityService.build.registerFarmer(farmerRef, coop),
+    claim: async (previous, hash, validUntil) => {
       const { count } = await prisma.farmer.updateMany({
-        where: { id: farmer.id, registeredAt: null, registerTx: farmer.registerTx },
+        where: { id: farmer.id, registeredAt: null, registerTx: previous },
         data: { registerTx: hash, registerTxValidUntil: validUntil },
       });
-      if (count === 0) throw registrationPending();
-      sentHash = hash;
-      sentValidUntil = validUntil;
-    });
-    return await markRegistered(hash);
-  } catch (error) {
-    if (!sentHash) throw error;
-    const outcome = await OnChainTraceabilityService.getTransactionOutcome(sentHash, sentValidUntil);
-    if (outcome === 'success') return markRegistered(sentHash);
-    if (outcome === 'failed' || outcome === 'never_landed') {
+      return count === 1;
+    },
+    release: async (hash) => {
       await prisma.farmer.updateMany({
-        where: { id: farmer.id, registerTx: sentHash, registeredAt: null },
+        where: { id: farmer.id, registerTx: hash, registeredAt: null },
         data: { registerTx: null, registerTxValidUntil: null },
       });
-      throw error;
-    }
-    logger.warn({ error, farmerRef, hash: sentHash }, 'Farmer registration outcome unknown, keeping it pending');
-    throw registrationPending();
-  }
+    },
+    confirm: async (hash) => {
+      await OnChainTraceabilityService.verifyFarmerRegistered(hash, farmerRef, coop);
+      await prisma.farmer.update({
+        where: { id: farmer.id },
+        data: { registerTx: hash, registeredAt: new Date(), registerTxValidUntil: null },
+      });
+    },
+    pending: registrationPending,
+  });
 }

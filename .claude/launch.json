@@ -4,13 +4,37 @@
     {
       "name": "webapp",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "webapp", "run", "dev"],
+      "runtimeArgs": [
+        "--prefix",
+        "webapp",
+        "run",
+        "dev"
+      ],
       "port": 3000
     },
     {
       "name": "backend",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "backend", "run", "dev"],
+      "runtimeArgs": [
+        "--prefix",
+        "backend",
+        "run",
+        "dev"
+      ],
+      "port": 4000
+    },
+    {
+      "name": "backend-local-db",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "DATABASE_URL=postgresql://postgres@127.0.0.1:55432/traceability",
+        "DIRECT_URL=postgresql://postgres@127.0.0.1:55432/traceability",
+        "npm",
+        "--prefix",
+        "backend",
+        "run",
+        "dev"
+      ],
       "port": 4000
     }
   ]

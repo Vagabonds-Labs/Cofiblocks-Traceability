@@ -43,6 +43,9 @@ model User {
   notificationsSent     Notification[]    @relation("NotificationSender")
   refreshTokens         RefreshToken[]
   sessions              Session[]
+  batchesReceived       Batch[]           @relation("BatchReceivedBy")
+  batchEvents           BatchEvent[]      @relation("BatchEventActor")
+  documentsUploaded     Document[]        @relation("DocumentUploadedBy")
 
   @@map("users")
 }
@@ -124,6 +127,7 @@ model Organization {
   collectionCenters CollectionCenter[]
   farmers           Farmer[]
   users             User[]
+  batches           Batch[]
 
   @@map("organizations")
 }
@@ -138,6 +142,7 @@ model CollectionCenter {
   organization   Organization @relation(fields: [organizationId], references: [id])
   farmers        Farmer[]
   users          User[]
+  batches        Batch[]
 
   @@unique([organizationId, name])
   @@map("collection_centers")
@@ -148,37 +153,221 @@ model CollectionCenter {
 /// Pilot farmer. Pre-loaded by the cooperative (list of IDs) and completed by
 /// the farmer through the Telegram bot.
 model Farmer {
-  id                   String            @id @default(uuid())
-  organizationId       String            @map("organization_id")
+  id                   String                 @id @default(uuid())
+  organizationId       String                 @map("organization_id")
   /// ID assigned by the cooperative. Unique within the cooperative.
-  coopFarmerId         String            @map("coop_farmer_id")
-  collectionCenterId   String?           @map("collection_center_id")
-  fullName             String?           @map("full_name")
+  coopFarmerId         String                 @map("coop_farmer_id")
+  collectionCenterId   String?                @map("collection_center_id")
+  fullName             String?                @map("full_name")
   phone                String?
   /// Numeric Telegram user ID. Set when the farmer identifies themselves in
   /// the bot with their cooperative ID.
-  telegramUserId       BigInt?           @unique @map("telegram_user_id")
-  telegramUsername     String?           @map("telegram_username")
+  telegramUserId       BigInt?                @unique @map("telegram_user_id")
+  telegramUsername     String?                @map("telegram_username")
   language             String?
-  status               FarmerStatus      @default(PRELOADED)
+  status               FarmerStatus           @default(PRELOADED)
   /// `register_farmer` transaction, signed by the farmer agent. It is stored
   /// before it is sent, with its expiry, so a retry can reconcile it instead
   /// of sending another one; `registeredAt` is set once it is confirmed.
-  registerTx           String?           @map("register_tx")
-  registerTxValidUntil DateTime?         @map("register_tx_valid_until")
-  registeredAt         DateTime?         @map("registered_at")
-  consentHash          String?           @map("consent_hash")
-  consentTx            String?           @map("consent_tx")
-  consentAt            DateTime?         @map("consent_at")
-  linkedAt             DateTime?         @map("linked_at")
-  createdAt            DateTime          @default(now()) @map("created_at")
-  updatedAt            DateTime          @updatedAt @map("updated_at")
-  organization         Organization      @relation(fields: [organizationId], references: [id])
-  collectionCenter     CollectionCenter? @relation(fields: [collectionCenterId], references: [id])
+  registerTx           String?                @map("register_tx")
+  registerTxValidUntil DateTime?              @map("register_tx_valid_until")
+  registeredAt         DateTime?              @map("registered_at")
+  /// Current EUDR consent: copied from the latest `FarmerConsent` once it is
+  /// confirmed on chain, and cleared if the farmer later refuses.
+  consentHash          String?                @map("consent_hash")
+  consentTx            String?                @map("consent_tx")
+  consentAt            DateTime?              @map("consent_at")
+  consentVersion       String?                @map("consent_version")
+  /// Current farm profile and practices: the latest `FarmerProfileVersion`
+  /// confirmed on chain (0 = none yet).
+  profile              Json?
+  profileVersion       Int                    @default(0) @map("profile_version")
+  profileHash          String?                @map("profile_hash")
+  profileTx            String?                @map("profile_tx")
+  profileAt            DateTime?              @map("profile_at")
+  linkedAt             DateTime?              @map("linked_at")
+  createdAt            DateTime               @default(now()) @map("created_at")
+  updatedAt            DateTime               @updatedAt @map("updated_at")
+  organization         Organization           @relation(fields: [organizationId], references: [id])
+  collectionCenter     CollectionCenter?      @relation(fields: [collectionCenterId], references: [id])
   botConversation      BotConversation?
+  consents             FarmerConsent[]
+  profileVersions      FarmerProfileVersion[]
+  plots                Plot[]
+  batches              Batch[]
 
   @@unique([organizationId, coopFarmerId])
   @@map("farmers")
+}
+
+/// One answer to the EUDR consent, as received from the farmer's bot. Kept
+/// even when the farmer refuses. Only an acceptance with every declaration
+/// goes on chain (`record_consent`, signed by the farmer agent).
+model FarmerConsent {
+  id                 String           @id @default(uuid())
+  farmerId           String           @map("farmer_id")
+  /// The integration message that carried it. A retry of that message finds
+  /// this row again instead of creating another.
+  integrationEventId String           @unique @map("integration_event_id")
+  consentVersion     String           @map("consent_version")
+  language           String
+  accepted           Boolean
+  declarations       Json
+  answeredAt         DateTime         @map("answered_at")
+  transcript         String?
+  audioRef           String?          @map("audio_ref")
+  /// SHA-256 of the canonical record; the value written on chain.
+  consentHash        String           @map("consent_hash")
+  /// On-chain write, stored before it is sent (see `ensureOnChain`).
+  tx                 String?
+  txValidUntil       DateTime?        @map("tx_valid_until")
+  confirmedAt        DateTime?        @map("confirmed_at")
+  createdAt          DateTime         @default(now()) @map("created_at")
+  farmer             Farmer           @relation(fields: [farmerId], references: [id])
+  integrationEvent   IntegrationEvent @relation(fields: [integrationEventId], references: [id])
+
+  @@index([farmerId])
+  @@map("farmer_consents")
+}
+
+/// One version of the farm profile and practices. Every edit is a new
+/// version with its own hash on chain (`set_profile`).
+model FarmerProfileVersion {
+  id                 String           @id @default(uuid())
+  farmerId           String           @map("farmer_id")
+  integrationEventId String           @unique @map("integration_event_id")
+  version            Int
+  /// The complete profile of this version (hashed as canonical JSON).
+  profile            Json
+  profileHash        String           @map("profile_hash")
+  transcript         String?
+  audioRef           String?          @map("audio_ref")
+  tx                 String?
+  txValidUntil       DateTime?        @map("tx_valid_until")
+  confirmedAt        DateTime?        @map("confirmed_at")
+  createdAt          DateTime         @default(now()) @map("created_at")
+  farmer             Farmer           @relation(fields: [farmerId], references: [id])
+  integrationEvent   IntegrationEvent @relation(fields: [integrationEventId], references: [id])
+
+  @@unique([farmerId, version])
+  @@map("farmer_profile_versions")
+}
+
+/// A coffee plot of the farmer's current profile. Rewritten from the profile
+/// each time a newer version is confirmed. GPS stays off chain.
+model Plot {
+  id             String   @id @default(uuid())
+  farmerId       String   @map("farmer_id")
+  /// Profile version this plot comes from.
+  profileVersion Int      @map("profile_version")
+  position       Int
+  name           String?
+  /// Area as the farmer gave it, in their unit.
+  sizeValue      Decimal? @map("size_value") @db.Decimal(12, 4)
+  sizeUnit       String?  @map("size_unit")
+  /// Area converted to hectares; `null` while the unit's factor is unknown.
+  sizeHectares   Decimal? @map("size_hectares") @db.Decimal(12, 4)
+  latitude       Float?
+  longitude      Float?
+  /// `shared` (Telegram location), `typed` or `dictated`.
+  locationSource String?  @map("location_source")
+  createdAt      DateTime @default(now()) @map("created_at")
+  farmer         Farmer   @relation(fields: [farmerId], references: [id], onDelete: Cascade)
+
+  @@unique([farmerId, position])
+  @@map("plots")
+}
+
+// ── batches ───────────────────────────────────────────────────────────────
+
+/// A delivery of coffee by a farmer, and the batch it becomes. Its number is
+/// its on-chain ID.
+model Batch {
+  id                 String            @id @default(uuid())
+  /// On-chain batch ID: `DD-MM-YYYY <farmer_ref>`, with `/2`, `/3`… for
+  /// further deliveries of the same farmer on the same day.
+  number             String            @unique
+  farmerId           String            @map("farmer_id")
+  organizationId     String            @map("organization_id")
+  collectionCenterId String            @map("collection_center_id")
+  stage              BatchStage        @default(DELIVERED)
+  /// Integration message that created it (farmer deliveries).
+  integrationEventId String?           @unique @map("integration_event_id")
+  // Delivery, as reported by the farmer.
+  deliveredAt        DateTime          @map("delivered_at")
+  estimatedKg        Decimal?          @map("estimated_kg") @db.Decimal(10, 2)
+  ripeness           String?
+  transcript         String?
+  audioRef           String?           @map("audio_ref")
+  /// SHA-256 of the canonical delivery record, written on chain.
+  dataHash           String            @map("data_hash")
+  createTx           String?           @map("create_tx")
+  createTxValidUntil DateTime?         @map("create_tx_valid_until")
+  /// Set once `create_batch` is confirmed on chain.
+  createdOnChainAt   DateTime?         @map("created_on_chain_at")
+  // Reception (weight and receipt), recorded once by the Collector.
+  weightGrams        BigInt?           @map("weight_grams")
+  receiptHash        String?           @map("receipt_hash")
+  receptionTx        String?           @map("reception_tx")
+  receivedAt         DateTime?         @map("received_at")
+  receivedById       String?           @map("received_by_id")
+  createdAt          DateTime          @default(now()) @map("created_at")
+  updatedAt          DateTime          @updatedAt @map("updated_at")
+  farmer             Farmer            @relation(fields: [farmerId], references: [id])
+  organization       Organization      @relation(fields: [organizationId], references: [id])
+  collectionCenter   CollectionCenter  @relation(fields: [collectionCenterId], references: [id])
+  receivedBy         User?             @relation("BatchReceivedBy", fields: [receivedById], references: [id])
+  integrationEvent   IntegrationEvent? @relation(fields: [integrationEventId], references: [id])
+  events             BatchEvent[]
+  documents          Document[]
+
+  @@index([farmerId])
+  @@index([organizationId, stage])
+  @@index([collectionCenterId])
+  @@map("batches")
+}
+
+/// One confirmed step in a batch's history, mirroring the contract's
+/// `StageRecord`. The details live in `data`; their hash is on chain.
+model BatchEvent {
+  id           String     @id @default(uuid())
+  batchId      String     @map("batch_id")
+  stage        BatchStage
+  /// Stellar account that signed it (the farmer agent for `DELIVERED`).
+  actorAddress String     @map("actor_address")
+  actorUserId  String?    @map("actor_user_id")
+  data         Json       @default("{}")
+  dataHash     String     @map("data_hash")
+  txHash       String     @unique @map("tx_hash")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  batch        Batch      @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  actorUser    User?      @relation("BatchEventActor", fields: [actorUserId], references: [id])
+
+  @@index([batchId])
+  @@map("batch_events")
+}
+
+/// A file attached to a batch. The file lives in Storage; its SHA-256 goes
+/// on chain (`attach_document`).
+model Document {
+  id           String    @id @default(uuid())
+  batchId      String    @map("batch_id")
+  /// E.g. `receipt`, `certificate`, `sale`, `other`.
+  kind         String
+  storagePath  String    @map("storage_path")
+  fileName     String    @map("file_name")
+  contentType  String    @map("content_type")
+  sizeBytes    Int       @map("size_bytes")
+  sha256       String
+  uploadedById String?   @map("uploaded_by_id")
+  txHash       String?   @map("tx_hash")
+  attachedAt   DateTime? @map("attached_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  batch        Batch     @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  uploadedBy   User?     @relation("DocumentUploadedBy", fields: [uploadedById], references: [id])
+
+  @@unique([batchId, sha256])
+  @@map("documents")
 }
 
 /// State of the bot's conversation with a Telegram chat. Stored in the
@@ -222,6 +411,9 @@ model IntegrationEvent {
   errorCode   String?                @map("error_code")
   createdAt   DateTime               @default(now()) @map("created_at")
   updatedAt   DateTime               @updatedAt @map("updated_at")
+  consent     FarmerConsent?
+  profile     FarmerProfileVersion?
+  batch       Batch?
 
   @@unique([source, eventId])
   @@map("integration_events")
@@ -237,6 +429,19 @@ enum StaffRole {
   INDUSTRY_MANAGER
   STORE_KEEPER
   EXPORT_MANAGER
+}
+
+/// Batch stages. Same names and order as the contract's `Stage` enum.
+enum BatchStage {
+  DELIVERED
+  RECEIVED
+  WASHING
+  FERMENTATION
+  DRYING
+  STORAGE
+  IN_TRANSPORT_TO_UNION
+  PREPARED_WITH_EXPORTABLE_BAG
+  SOLD
 }
 
 enum OrganizationKind {

@@ -1,26 +1,42 @@
-import { createHash } from 'crypto';
 import { IntegrationEventStatus, Prisma } from '@prisma/client';
+import { z } from 'zod';
 
 import { HttpException } from '@/exceptions/HttpException';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
-import { farmerLinkedSchema, integrationEventSchema } from '@/schemas/integrationSchemas';
+import {
+  deliveryCreatedSchema,
+  farmerConsentSchema,
+  farmerLinkedSchema,
+  farmerProfileSchema,
+  integrationEventSchema,
+} from '@/schemas/integrationSchemas';
+import * as DeliveriesService from '@/services/app/DeliveriesService';
+import * as FarmerDataService from '@/services/app/FarmerDataService';
+import type { IntegrationContext } from '@/services/app/FarmerDataService';
 import * as FarmersService from '@/services/app/FarmersService';
+import { sha256Canonical } from '@/utils/canonicalJson';
 
 const SOURCE = 'voiceledger';
 
 /** A `PROCESSING` event older than this is assumed abandoned (crash) and retried. */
 const STALE_PROCESSING_MS = 2 * 60 * 1000;
 
-/** Events defined in the integration contract that arrive in week 2. */
-const UPCOMING_EVENTS = new Set(['farmer.consent', 'farmer.profile', 'delivery.created']);
-
 export interface IntegrationResponse {
   status: number;
   body: Record<string, unknown>;
 }
 
-type Handler = (data: Record<string, unknown>) => Promise<Record<string, unknown>>;
+type Handler = (data: Record<string, unknown>, ctx: IntegrationContext) => Promise<Record<string, unknown>>;
+
+/** Validates `data` with `schema`, or fails with `400 INVALID_PAYLOAD`. */
+function parse<T>(type: string, schema: z.ZodType<T>, data: Record<string, unknown>): T {
+  const parsed = schema.safeParse(data);
+  if (!parsed.success) {
+    throw new HttpException(400, `Invalid ${type} data`, 'INVALID_PAYLOAD', parsed.error.issues);
+  }
+  return parsed.data;
+}
 
 /**
  * Event handlers. A `Map`, not an object literal: looking up an arbitrary
@@ -29,39 +45,33 @@ type Handler = (data: Record<string, unknown>) => Promise<Record<string, unknown
  */
 const HANDLERS = new Map<string, Handler>([
   ['farmer.linked', async (data) => {
-    const parsed = farmerLinkedSchema.safeParse(data);
-    if (!parsed.success) {
-      throw new HttpException(400, 'Invalid farmer.linked data', 'INVALID_PAYLOAD', parsed.error.issues);
-    }
+    const parsed = parse('farmer.linked', farmerLinkedSchema, data);
     const result = await FarmersService.linkFarmerFromIntegration({
-      coopCode: parsed.data.coop_code,
-      farmerId: parsed.data.farmer_id,
-      telegramUserId: parsed.data.telegram_user_id,
-      telegramUsername: parsed.data.telegram_username,
-      language: parsed.data.language,
+      coopCode: parsed.coop_code,
+      farmerId: parsed.farmer_id,
+      telegramUserId: parsed.telegram_user_id,
+      telegramUsername: parsed.telegram_username,
+      language: parsed.language,
     });
     return { ...result };
   }],
+  ['farmer.consent', async (data, ctx) => ({
+    ...(await FarmerDataService.recordConsent(ctx, parse('farmer.consent', farmerConsentSchema, data))),
+  })],
+  ['farmer.profile', async (data, ctx) => ({
+    ...(await FarmerDataService.updateProfile(ctx, parse('farmer.profile', farmerProfileSchema, data))),
+  })],
+  ['delivery.created', async (data, ctx) => ({
+    ...(await DeliveriesService.createDelivery(ctx, parse('delivery.created', deliveryCreatedSchema, data))),
+  })],
 ]);
-
-/** JSON with sorted keys, so the same content always serializes the same way. */
-function canonicalJson(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
-  if (value !== null && typeof value === 'object') {
-    const entries = Object.keys(value as Record<string, unknown>)
-      .sort()
-      .map((key) => `${JSON.stringify(key)}:${canonicalJson((value as Record<string, unknown>)[key])}`);
-    return `{${entries.join(',')}}`;
-  }
-  return JSON.stringify(value);
-}
 
 /**
  * Fingerprint of what an event asks for: its type and data. A retry may
  * re-serialize the JSON or refresh `occurred_at`; it is still the same event.
  */
 function contentHash(type: string, data: Record<string, unknown>): string {
-  return createHash('sha256').update(canonicalJson({ type, data })).digest('hex');
+  return sha256Canonical({ type, data });
 }
 
 function failure(eventId: string | null, type: string | null, status: number, code: string, message: string, details?: unknown): IntegrationResponse {
@@ -138,7 +148,7 @@ export async function receiveVoiceLedgerEvent(payload: unknown): Promise<Integra
   if (!envelope.success) {
     return failure(null, null, 400, 'INVALID_PAYLOAD', 'Invalid event envelope', envelope.error.issues);
   }
-  const { event_id: eventId, type, data } = envelope.data;
+  const { event_id: eventId, type, data, occurred_at: occurredAt } = envelope.data;
 
   const claimed = await claim(eventId, type, contentHash(type, data), payload as Prisma.InputJsonValue);
   if (claimed.kind === 'answer') return claimed.response;
@@ -148,11 +158,12 @@ export async function receiveVoiceLedgerEvent(payload: unknown): Promise<Integra
   try {
     const handler = HANDLERS.get(type);
     if (!handler) {
-      throw UPCOMING_EVENTS.has(type)
-        ? new HttpException(422, `${type} is not supported yet`, 'UNSUPPORTED_EVENT')
-        : new HttpException(422, `Unknown event type ${type}`, 'UNKNOWN_EVENT_TYPE');
+      throw new HttpException(422, `Unknown event type ${type}`, 'UNKNOWN_EVENT_TYPE');
     }
-    const result = await handler(data);
+    const result = await handler(data, {
+      integrationEventId: claimed.id,
+      occurredAt: occurredAt ? new Date(occurredAt) : null,
+    });
     txHash = typeof result.tx_hash === 'string' ? result.tx_hash : null;
     response = { status: 200, body: { event_id: eventId, type, status: 'succeeded', result } };
   } catch (error) {

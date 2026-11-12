@@ -152,11 +152,15 @@ Farmers do not use the web app: they talk to a **Telegram voice bot built and ru
 | Event | On-chain action (v1 contract) | Status |
 |---|---|---|
 | `farmer.linked` | `register_farmer` | Implemented |
-| `farmer.consent` | `record_consent` | Week 2 (`422 UNSUPPORTED_EVENT` until then) |
-| `farmer.profile` | `set_profile` | Week 2 |
-| `delivery.created` | `create_batch`; we generate the batch number `DD-MM-YYYY [FarmerID]` | Week 2 |
+| `farmer.consent` | `record_consent` (only for an acceptance with every declaration) | Implemented |
+| `farmer.profile` | `set_profile`; every edit is a new version with its own hash | Implemented |
+| `delivery.created` | `create_batch`; we generate the batch number `DD-MM-YYYY <farmer_ref>` (`/2`, `/3`… for more deliveries that day) | Implemented |
 
-Retries with the same `event_id` get the stored answer and never write on chain twice; the same `event_id` with different content is rejected. In the other direction, we will notify VoiceLedger (signed webhook) when the Collector records the weight or the batch changes stage; the format is being agreed with VoiceLedger.
+Retries with the same `event_id` get the stored answer and never write on chain twice; the same `event_id` with different content is rejected. Every farmer-agent write stores its transaction hash before sending it, so an interrupted write is reconciled with the network instead of being sent again (`src/services/onchain/ensureOnChain.ts`). The hashes on chain are SHA-256 of the canonical JSON of the off-chain record (`src/utils/canonicalJson.ts`), so anyone with the record can recompute them.
+
+Pilot settings still being confirmed (consent texts, the fachasa → hectare factor, the pilot area for GPS checks) live in `src/config/pilot.ts`, with `FACHASA_TO_HECTARES` and `FARM_AREA_BBOX` as overrides.
+
+**Simulator.** With the backend running, `npm run voiceledger:demo -- KK ID001` runs a farmer's whole journey (link → consent → profile → delivery → retry) through the signed API and prints the Stellar Expert link of each step. `npm run voiceledger:send` sends a single event. The OpenAPI description is [`docs/voiceledger-openapi.yaml`](../docs/voiceledger-openapi.yaml). In the other direction, we will notify VoiceLedger (signed webhook) when the Collector records the weight or the batch changes stage; the format is being agreed with VoiceLedger.
 
 **Our own bot (`src/bot/`)** is a week-0 prototype from before VoiceLedger took over the bot. It validates the farmer's ID against the list. It is no longer used: it stays off while `TELEGRAM_BOT_TOKEN` is empty.
 
@@ -165,6 +169,5 @@ Retries with the same `event_id` get the stored answer and never write on chain 
 By sprint week (details in the [plan](../docs/implementation-plan.md)):
 
 - **Staging** (postponed): deploy and the cross-domain cookie setup (review finding R6).
-- **Week 2:** the `Batch`, `BatchEvent`, `Plot` and `Document` models; VoiceLedger events for consent, profile and deliveries; VoiceLedger simulator and OpenAPI document.
 - **Week 3:** endpoints for reception (weight and receipt), stage changes, documents, batch history and CSV export; notifications to VoiceLedger.
 - **Week 4:** permission tests for every role against every endpoint, in CI.

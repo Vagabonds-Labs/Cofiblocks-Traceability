@@ -1,7 +1,8 @@
 import { StaffRole } from '@prisma/client';
+import { Transaction } from '@stellar/stellar-sdk';
 
 import { HttpException } from '@/exceptions/HttpException';
-import { ContractFactory, DEFAULT_VALIDITY_SECONDS, EventsClient, StellarClient } from '@/lib/StellarContracts';
+import { ContractFactory, DEFAULT_VALIDITY_SECONDS, EventsClient, EventsParser, StellarClient } from '@/lib/StellarContracts';
 import { ROLES } from '@/lib/StellarContracts/types';
 import { isSameAddress, withAccountLock } from '@/lib/StellarContracts/utils';
 import { logger } from '@/lib/logger';
@@ -56,30 +57,117 @@ export async function revokeRole(walletAddress: string): Promise<string> {
   return hash;
 }
 
+/** Builds a transaction signed by the farmer agent (see `Traceability`). */
+export type FarmerAgentBuild = () => Promise<Transaction>;
+
 /**
- * Registers a farmer on chain by their `farmer_ref`. The farmer agent signs it
- * (farmers have no wallet) and the admin pays the fee with a fee-bump. The
- * caller must have checked the ID against the cooperative's list first.
+ * Submits a farmer-agent transaction: the farmer agent signs it (farmers have
+ * no wallet) and the admin pays the fee with a fee-bump.
  *
  * `beforeSubmit` receives the final transaction hash and expiry before
  * anything is sent, so the caller can store them and reconcile later if the
  * outcome is unknown. If it throws, nothing is sent.
  */
-export async function registerFarmer(
-  farmerRef: string,
-  coop: number,
+export async function submitAsFarmerAgent(
+  build: FarmerAgentBuild,
   beforeSubmit: (hash: string, validUntil: Date) => Promise<void>
 ): Promise<string> {
-  const hash = await farmerAgentTransaction(async () => {
-    const inner = await contracts.getTraceabilityService().registerFarmer(farmerRef, coop);
+  return farmerAgentTransaction(async () => {
+    const inner = await build();
     const envelope = contracts.getTxSubmitter().wrapInFeeBump(inner);
     const hash = Buffer.from(envelope.hash()).toString('hex');
     await beforeSubmit(hash, new Date(Number(inner.timeBounds!.maxTime) * 1000));
     await contracts.getTxSubmitter().submitEnvelope(envelope);
     return hash;
   });
-  await verifyFarmerRegistered(hash, farmerRef, coop);
-  return hash;
+}
+
+// ── farmer-agent transaction builders ─────────────────────────────────────
+
+export const build = {
+  registerFarmer: (farmerRef: string, coop: number): FarmerAgentBuild =>
+    () => contracts.getTraceabilityService().registerFarmer(farmerRef, coop),
+  recordConsent: (farmerRef: string, consentHash: string): FarmerAgentBuild =>
+    () => contracts.getTraceabilityService().recordConsent(farmerRef, consentHash),
+  setProfile: (farmerRef: string, profileHash: string): FarmerAgentBuild =>
+    () => contracts.getTraceabilityService().setProfile(farmerRef, profileHash),
+  createBatch: (id: string, farmerRef: string, center: number, dataHash: string): FarmerAgentBuild =>
+    () => contracts.getTraceabilityService().createBatch(id, farmerRef, center, dataHash),
+};
+
+/**
+ * Reads a confirmed transaction's events and checks them with `matches`.
+ *
+ * The RPC keeps transactions only for a few hours, so reconciling an old one
+ * may not find its events. Then the contract's state is the lasting proof:
+ * `fallback` checks it.
+ */
+async function verifyTransaction(
+  label: string,
+  hash: string,
+  matches: (events: EventsParser) => boolean,
+  fallback: () => Promise<boolean>
+): Promise<void> {
+  let events: EventsParser;
+  try {
+    events = await eventsClient.getTransactionEvents(hash);
+  } catch (error) {
+    if (!(error instanceof HttpException && error.code === 'TRANSACTION_NOT_FOUND')) throw error;
+    if (!(await fallback())) throw error;
+    logger.info({ label, hash }, 'On-chain write verified from contract state');
+    return;
+  }
+  if (!matches(events)) {
+    logger.error({ label, hash, events: events.getEvents() }, 'Transaction events do not match the request');
+    throw new HttpException(502, `On-chain write did not match the request (${label})`, 'ONCHAIN_MISMATCH');
+  }
+  logger.info({ label, hash }, 'On-chain write confirmed');
+}
+
+export function verifyConsentRecorded(hash: string, farmerRef: string, consentHash: string): Promise<void> {
+  return verifyTransaction(
+    `record_consent ${farmerRef}`,
+    hash,
+    (events) => events.parseConsentRecorded().some((e) => e.farmer_ref === farmerRef && e.consent_hash === consentHash),
+    async () => (await getFarmer(farmerRef))?.consent_hash === consentHash
+  );
+}
+
+export function verifyProfileUpdated(hash: string, farmerRef: string, profileHash: string): Promise<void> {
+  return verifyTransaction(
+    `set_profile ${farmerRef}`,
+    hash,
+    (events) => events.parseProfileUpdated().some((e) => e.farmer_ref === farmerRef && e.profile_hash === profileHash),
+    // A newer version may have replaced it on chain since; then the events
+    // were the only proof and this one cannot be re-verified.
+    async () => (await getFarmer(farmerRef))?.profile_hash === profileHash
+  );
+}
+
+export function verifyBatchCreated(
+  hash: string,
+  id: string,
+  farmerRef: string,
+  center: number,
+  dataHash: string
+): Promise<void> {
+  return verifyTransaction(
+    `create_batch ${id}`,
+    hash,
+    (events) =>
+      events
+        .parseBatchCreated()
+        .some((e) => e.id === id && e.farmer_ref === farmerRef && e.collection_center === center && e.data_hash === dataHash),
+    async () => {
+      const batch = await findBatch(id);
+      return (
+        !!batch &&
+        batch.farmer_ref === farmerRef &&
+        batch.collection_center === center &&
+        batch.history[0]?.data_hash === dataHash
+      );
+    }
+  );
 }
 
 /**
@@ -127,4 +215,19 @@ export async function getMember(walletAddress: string) {
 
 export async function getBatch(id: string) {
   return contracts.getTraceabilityService().getBatch(id);
+}
+
+/** Like `getBatch`, but `null` when the batch does not exist on chain. */
+export async function findBatch(id: string) {
+  try {
+    return await getBatch(id);
+  } catch (error) {
+    if (error instanceof HttpException && error.code === 'BATCH_NOT_FOUND') return null;
+    throw error;
+  }
+}
+
+/** The farmer agent's address: the actor of every `Delivered` record. */
+export function getFarmerAgentAddress(): string {
+  return contracts.getClient().getFarmerAgentKeypair().publicKey();
 }

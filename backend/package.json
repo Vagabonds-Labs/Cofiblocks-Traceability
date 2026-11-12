@@ -17,6 +17,7 @@
     "admin:grant": "tsx scripts/grant-admin.ts",
     "chain:sync-roles": "tsx scripts/sync-roles.ts",
     "voiceledger:send": "tsx scripts/voiceledger-send.ts",
+    "voiceledger:demo": "tsx scripts/voiceledger-demo.ts",
     "db:seed": "tsx scripts/seed.ts"
   },
   "keywords": [],

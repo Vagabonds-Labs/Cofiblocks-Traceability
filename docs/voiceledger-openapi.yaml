@@ -1,0 +1,380 @@
+openapi: 3.1.0
+info:
+  title: CofiBlocks Traceability — VoiceLedger integration
+  version: 2026-11-12
+  description: |
+    Events that VoiceLedger's farmer bot sends to CofiBlocks. The full contract
+    (signing, retries, conversation rules) is in `voiceledger-integration.md`;
+    this file is the machine-readable part.
+
+    Every request is signed: `X-VoiceLedger-Signature` is `sha256=` + hex of
+    `HMAC-SHA256(secret, "<timestamp>.<METHOD>.<path>.<raw body>")`, and
+    `X-VoiceLedger-Timestamp` is the Unix time in seconds (±5 minutes).
+servers:
+  - url: http://localhost:4000
+    description: Local backend (staging URL shared privately)
+security:
+  - voiceLedgerSignature: []
+paths:
+  /api/integrations/voiceledger/events:
+    post:
+      summary: Send one event from the farmer bot
+      operationId: sendEvent
+      parameters:
+        - $ref: '#/components/parameters/Timestamp'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/FarmerLinkedEvent'
+                - $ref: '#/components/schemas/FarmerConsentEvent'
+                - $ref: '#/components/schemas/FarmerProfileEvent'
+                - $ref: '#/components/schemas/DeliveryCreatedEvent'
+              discriminator:
+                propertyName: type
+                mapping:
+                  farmer.linked: '#/components/schemas/FarmerLinkedEvent'
+                  farmer.consent: '#/components/schemas/FarmerConsentEvent'
+                  farmer.profile: '#/components/schemas/FarmerProfileEvent'
+                  delivery.created: '#/components/schemas/DeliveryCreatedEvent'
+            examples:
+              farmer.linked:
+                value:
+                  event_id: 9b2f3c1e-7d1a-4c55-9a51-2f0f4f6f8a10
+                  type: farmer.linked
+                  occurred_at: '2026-11-23T09:30:00Z'
+                  data: { coop_code: KK, farmer_id: ID001, telegram_user_id: '123456789', language: om }
+              farmer.consent:
+                value:
+                  event_id: 3c1d0b7a-62a4-4a0f-8f5e-1d2a9b9c6e01
+                  type: farmer.consent
+                  data:
+                    farmer_ref: KK-ID001
+                    consent_version: 2026-11-v1
+                    language: om
+                    accepted: true
+                    answered_at: '2026-11-23T09:35:00Z'
+                    declarations:
+                      data_processing: true
+                      no_deforestation_since_2020_12_31: true
+                      information_is_accurate: true
+              farmer.profile:
+                value:
+                  event_id: 5e7f2a19-0c3b-4d8e-a6f1-7b2c9d0e1f23
+                  type: farmer.profile
+                  data:
+                    farmer_ref: KK-ID001
+                    plots:
+                      - name: Plot 1
+                        size: { value: 1.5, unit: fachasa }
+                        location: { lat: 7.86, lng: 36.62, source: shared }
+                    practices: { shade_trees: true, fertilizer: compost }
+              delivery.created:
+                value:
+                  event_id: 8a4b6c2d-1e3f-4a5b-9c7d-0e1f2a3b4c5d
+                  type: delivery.created
+                  occurred_at: '2026-11-24T07:10:00Z'
+                  data: { farmer_ref: KK-ID001, collection_center: Kirkir, estimated_kg: 45, ripeness: ripe }
+      responses:
+        '200':
+          description: Processed. Retries with the same `event_id` return this same answer.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [event_id, type, status, result]
+                properties:
+                  event_id: { type: string }
+                  type: { type: string }
+                  status: { const: succeeded }
+                  result:
+                    oneOf:
+                      - $ref: '#/components/schemas/FarmerLinkedResult'
+                      - $ref: '#/components/schemas/FarmerConsentResult'
+                      - $ref: '#/components/schemas/FarmerProfileResult'
+                      - $ref: '#/components/schemas/DeliveryCreatedResult'
+        '202':
+          description: Another copy of this event is being processed. Check its status a few seconds later.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  event_id: { type: string }
+                  type: { type: string }
+                  status: { const: processing }
+        '400': { $ref: '#/components/responses/Failure' }
+        '401': { $ref: '#/components/responses/Failure' }
+        '404': { $ref: '#/components/responses/Failure' }
+        '409': { $ref: '#/components/responses/Failure' }
+        '422': { $ref: '#/components/responses/Failure' }
+        '500': { $ref: '#/components/responses/Failure' }
+        '503': { $ref: '#/components/responses/Failure' }
+  /api/integrations/voiceledger/events/{eventId}:
+    get:
+      summary: Current answer for an event
+      operationId: getEvent
+      parameters:
+        - $ref: '#/components/parameters/Timestamp'
+        - name: eventId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: The stored success answer (same body as the POST). }
+        '202': { description: Still processing. }
+        '404': { $ref: '#/components/responses/Failure' }
+components:
+  securitySchemes:
+    voiceLedgerSignature:
+      type: apiKey
+      in: header
+      name: X-VoiceLedger-Signature
+      description: '`sha256=<hex HMAC-SHA256(secret, "<timestamp>.<METHOD>.<path>.<raw body>")>`'
+  parameters:
+    Timestamp:
+      name: X-VoiceLedger-Timestamp
+      in: header
+      required: true
+      schema: { type: string, pattern: '^\d+$' }
+      description: Unix time in seconds when the request was signed.
+  responses:
+    Failure:
+      description: |
+        The event failed. `error.code` is stable; `error.message` is for logs.
+        4xx are final for that `event_id`; 5xx are retried with the same `event_id`.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [event_id, type, status, error]
+            properties:
+              event_id: { type: [string, 'null'] }
+              type: { type: [string, 'null'] }
+              status: { const: failed }
+              error:
+                type: object
+                required: [code, message]
+                properties:
+                  code:
+                    type: string
+                    enum:
+                      - MISSING_SIGNATURE
+                      - STALE_TIMESTAMP
+                      - INVALID_SIGNATURE
+                      - INTEGRATION_DISABLED
+                      - INVALID_PAYLOAD
+                      - EVENT_ID_REUSED
+                      - EVENT_NOT_FOUND
+                      - UNKNOWN_EVENT_TYPE
+                      - COOP_NOT_FOUND
+                      - FARMER_NOT_FOUND
+                      - FARMER_REF_TAKEN
+                      - TELEGRAM_ALREADY_LINKED
+                      - FARMER_NOT_LINKED
+                      - CONSENT_REQUIRED
+                      - UNKNOWN_CONSENT_VERSION
+                      - INVALID_DECLARATIONS
+                      - LOCATION_OUTSIDE_AREA
+                      - UNKNOWN_COLLECTION_CENTER
+                      - ESTIMATED_KG_TOO_HIGH
+                      - INVALID_DELIVERY_DATE
+                      - TOO_MANY_DELIVERIES
+                      - REGISTRATION_PENDING
+                      - TRANSACTION_PENDING
+                      - STELLAR_RPC_UNAVAILABLE
+                      - TRANSACTION_NOT_FOUND
+                      - INTERNAL_ERROR
+                  message: { type: string }
+                  details: {}
+  schemas:
+    Envelope:
+      type: object
+      required: [event_id, type, data]
+      properties:
+        event_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: Chosen by VoiceLedger. Retries reuse it; each new farmer action needs a new one.
+        type: { type: string }
+        occurred_at:
+          type: string
+          format: date-time
+          description: When it happened on VoiceLedger's side. For deliveries it sets the delivery date (at most 14 days back).
+    FarmerRef:
+      type: string
+      pattern: '^[A-Za-z]{1,16}-\S+$'
+      maxLength: 64
+      description: Returned by `farmer.linked`, e.g. `KK-ID001`. Case-insensitive.
+    Evidence:
+      type: object
+      properties:
+        transcript: { type: [string, 'null'], maxLength: 4000 }
+        audio_ref: { type: [string, 'null'], maxLength: 512 }
+    TxResult:
+      type: object
+      required: [tx_hash, explorer_url]
+      properties:
+        tx_hash: { type: string, description: Stellar transaction hash (hex). }
+        explorer_url: { type: string, format: uri }
+
+    FarmerLinkedEvent:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          properties:
+            type: { const: farmer.linked }
+            data:
+              type: object
+              required: [coop_code, farmer_id, telegram_user_id]
+              properties:
+                coop_code: { type: string, enum: [KK, DM, KN] }
+                farmer_id: { type: string, maxLength: 48 }
+                telegram_user_id: { type: string, pattern: '^\d{1,20}$' }
+                telegram_username: { type: [string, 'null'], maxLength: 64 }
+                language: { type: [string, 'null'], enum: [om, am, en, null] }
+    FarmerLinkedResult:
+      allOf:
+        - $ref: '#/components/schemas/TxResult'
+        - type: object
+          required: [farmer_ref, coop_code, already_linked]
+          properties:
+            farmer_ref: { $ref: '#/components/schemas/FarmerRef' }
+            coop_code: { type: string }
+            already_linked: { type: boolean }
+
+    FarmerConsentEvent:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          properties:
+            type: { const: farmer.consent }
+            data:
+              allOf:
+                - $ref: '#/components/schemas/Evidence'
+                - type: object
+                  required: [farmer_ref, consent_version, language, accepted, answered_at, declarations]
+                  properties:
+                    farmer_ref: { $ref: '#/components/schemas/FarmerRef' }
+                    consent_version: { type: string, examples: [2026-11-v1] }
+                    language: { type: string, enum: [om, am, en] }
+                    accepted: { type: boolean, description: The farmer's explicit answer. Never a default. }
+                    answered_at: { type: string, format: date-time }
+                    declarations:
+                      type: object
+                      description: Exactly the declarations of `consent_version`.
+                      additionalProperties: { type: boolean }
+                      properties:
+                        data_processing: { type: boolean }
+                        no_deforestation_since_2020_12_31: { type: boolean }
+                        information_is_accurate: { type: boolean }
+    FarmerConsentResult:
+      type: object
+      required: [farmer_ref, consent_version, consented, consent_hash, tx_hash, explorer_url]
+      properties:
+        farmer_ref: { $ref: '#/components/schemas/FarmerRef' }
+        consent_version: { type: string }
+        consented:
+          type: boolean
+          description: '`true` only if `accepted` and every declaration is `true`. Otherwise nothing goes on chain and profile and deliveries are blocked.'
+        consent_hash: { type: string }
+        tx_hash: { type: [string, 'null'] }
+        explorer_url: { type: [string, 'null'] }
+
+    Plot:
+      type: object
+      properties:
+        name: { type: [string, 'null'], maxLength: 64 }
+        size:
+          type: [object, 'null']
+          required: [value, unit]
+          properties:
+            value: { type: number, exclusiveMinimum: 0, maximum: 1000 }
+            unit: { type: string, enum: [fachasa, hectare] }
+        location:
+          type: [object, 'null']
+          required: [lat, lng, source]
+          description: Must fall inside the pilot area (Gomma woreda).
+          properties:
+            lat: { type: number }
+            lng: { type: number }
+            source: { type: string, enum: [shared, typed, dictated] }
+    FarmerProfileEvent:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          properties:
+            type: { const: farmer.profile }
+            data:
+              allOf:
+                - $ref: '#/components/schemas/Evidence'
+                - type: object
+                  required: [farmer_ref]
+                  description: Send `plots`, `practices` or both. A supplied field replaces the previous one completely; an omitted one is kept.
+                  properties:
+                    farmer_ref: { $ref: '#/components/schemas/FarmerRef' }
+                    plots:
+                      type: array
+                      maxItems: 20
+                      items: { $ref: '#/components/schemas/Plot' }
+                    practices:
+                      type: object
+                      description: Provisional until the final questionnaire is agreed. Keys are snake_case.
+                      additionalProperties:
+                        oneOf:
+                          - { type: string, maxLength: 200 }
+                          - { type: number }
+                          - { type: boolean }
+                          - { type: array, items: { type: string }, maxItems: 20 }
+    FarmerProfileResult:
+      allOf:
+        - $ref: '#/components/schemas/TxResult'
+        - type: object
+          required: [farmer_ref, profile_version, profile_hash, plots, practices]
+          properties:
+            farmer_ref: { $ref: '#/components/schemas/FarmerRef' }
+            profile_version: { type: integer, minimum: 1 }
+            profile_hash: { type: string }
+            plots:
+              type: array
+              items:
+                allOf:
+                  - $ref: '#/components/schemas/Plot'
+                  - type: object
+                    properties:
+                      hectares: { type: [number, 'null'], description: '`null` until the unit''s conversion factor is confirmed.' }
+            practices: { type: object }
+
+    DeliveryCreatedEvent:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          properties:
+            type: { const: delivery.created }
+            data:
+              allOf:
+                - $ref: '#/components/schemas/Evidence'
+                - type: object
+                  required: [farmer_ref, collection_center]
+                  properties:
+                    farmer_ref: { $ref: '#/components/schemas/FarmerRef' }
+                    collection_center: { type: string, description: One of the farmer's cooperative's centers (case-insensitive). }
+                    estimated_kg: { type: [number, 'null'], exclusiveMinimum: 0, maximum: 2000 }
+                    ripeness: { type: [string, 'null'], maxLength: 32 }
+    DeliveryCreatedResult:
+      allOf:
+        - $ref: '#/components/schemas/TxResult'
+        - type: object
+          required: [batch_id, farmer_ref, collection_center, delivered_at, stage, data_hash]
+          properties:
+            batch_id: { type: string, description: Store and show it as is; do not build or parse it. }
+            farmer_ref: { $ref: '#/components/schemas/FarmerRef' }
+            collection_center: { type: string }
+            estimated_kg: { type: [number, 'null'] }
+            ripeness: { type: [string, 'null'] }
+            delivered_at: { type: string, format: date-time }
+            stage: { const: DELIVERED }
+            data_hash: { type: string }

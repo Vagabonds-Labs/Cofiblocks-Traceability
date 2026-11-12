@@ -57,6 +57,15 @@ Each week ends with a **visual demo**, with real transactions on Stellar Testnet
 - [x] Database on Supabase (November 11): migrations and seed applied; RLS on every table and no table privileges for `anon`/`authenticated`, so the Data API exposes nothing.
 - [ ] Staging (postponed), together with R6 (cross-domain cookies).
 
+**Week 2 (started early, November 12; branch `semana-2`):**
+
+- [x] Models `FarmerConsent`, `FarmerProfileVersion`, `Plot`, `Batch`, `BatchEvent` and `Document` (migration `20261112000000_week2_farmer_data_and_batches`, with RLS like the rest). Applied to the local database; **still to apply to Supabase** (`npx prisma migrate deploy`).
+- [x] VoiceLedger events `farmer.consent` (`record_consent`), `farmer.profile` (`set_profile`, a new version per edit) and `delivery.created` (`create_batch`, batch number `DD-MM-YYYY <farmer_ref>` and `/2`, `/3`… for more deliveries that day). Profile and deliveries require consent.
+- [x] Every farmer-agent write is exactly-once with the same reconciliation as the registration (`ensureOnChain`); on-chain hashes are SHA-256 of canonical JSON and were checked against the contract.
+- [x] Simulator (`npm run voiceledger:demo -- KK ID001`) and [OpenAPI description](voiceledger-openapi.yaml). Checked on testnet on November 12: link, consent, profile v1/v2, two deliveries the same day, a retry with the same `event_id`, a refusal and the error cases.
+- [x] Provisional pilot settings in `backend/src/config/pilot.ts`: consent texts `2026-11-v1` (English draft), fachasa factor (`FACHASA_TO_HECTARES`, empty → hectares stay empty) and the pilot area box (`FARM_AREA_BBOX`).
+- [ ] SOW evidence for deliverable 2: contract on Stellar Expert and the repo with the tests.
+
 **Week 0 decisions:**
 
 - **Farmer's on-chain ID:** `farmer_ref` = cooperative code + their ID, for example `KK-ID001`. The IDs each cooperative assigns are only unique within that cooperative.
