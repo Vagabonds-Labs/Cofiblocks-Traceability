@@ -212,7 +212,7 @@
     "admin_users_text": "Asigna a cada persona su rol y cooperativa. El rol se escribe en el contrato.",
     "admin_farmers_text": "Sube la lista de caficultores de cada cooperativa y sigue su registro en el bot.",
     "open": "Abrir",
-    "tasks_COLLECTOR": "Registra las entregas en tu centro y pesa las que el caficultor confirmó.",
+    "tasks_COLLECTOR": "Registra entregas, sigue las confirmaciones de los productores y finaliza las recepciones de tu centro.",
     "tasks_INDUSTRY_MANAGER": "Pasa los lotes de tu cooperativa por lavado, fermentación y secado, y adjunta documentos.",
     "tasks_STORE_KEEPER": "Registra el almacenamiento y el envío a la unión.",
     "tasks_EXPORT_MANAGER": "Prepara los lotes para exportar y regístralos como vendidos.",
@@ -418,14 +418,15 @@
     "exporting": "Exportando…"
   },
   "pending": {
-    "title": "Entregas por pesar",
-    "subtitle": "El caficultor confirmó estas entregas en el bot. Firma el peso y fotografía el recibo.",
+    "title": "Pendientes de finalizar",
+    "subtitle": "Revisa el peso, adjunta el recibo y firma la recepción.",
     "count": "{count} pendientes",
-    "empty": "No hay nada por pesar ahora.",
+    "empty": "No tienes recepciones pendientes en este momento.",
     "delivered": "Entregado {time} en {center}",
     "estimated": "unos {kg} kg",
     "weigh": "Registrar peso",
-    "confirmed": "{kg} kg confirmados por el caficultor"
+    "confirmed": "{kg} kg confirmados por el caficultor",
+    "finalize": "Finalizar recepción"
   },
   "reception": {
     "title": "Registrar peso y recibo",
@@ -448,7 +449,8 @@
     "view_tx": "Ver la transacción en Stellar",
     "error_generic": "Algo salió mal. Inténtalo de nuevo.",
     "error_cancelled": "Cancelaste la firma. No se registró nada.",
-    "weight_confirmed": "El caficultor confirmó este peso en el bot. Es el que queda registrado en Stellar."
+    "weight_confirmed": "El caficultor confirmó este peso en el bot. Es el que queda registrado en Stellar.",
+    "title_confirmed": "Finalizar recepción"
   },
   "summary": {
     "title": "El piloto de un vistazo",
@@ -516,7 +518,7 @@
     "waiting_count": "{count} esperando al caficultor",
     "kg": "{kg} kg",
     "waiting_until": "Esperando que el caficultor confirme en el bot, hasta el {time}.",
-    "confirmed_batch": "Confirmada por el caficultor: lote {batch}. Firma el peso abajo.",
+    "confirmed_batch": "Confirmado por el productor: lote {batch}.",
     "cancel": "Cancelar",
     "status": {
       "PENDING": "Esperando",
@@ -547,7 +549,7 @@
     "submit": "Enviar al caficultor para que confirme",
     "sending": "Enviando…",
     "sent": "{kg} kg enviados al caficultor",
-    "sent_text": "A {farmer} se le pedirá en el bot que la confirme. Cuando lo haga, aparece en Entregas por pesar para que firmes el peso.",
+    "sent_text": "Se le pedirá a {farmer} que confirme en el bot. Una vez confirmado y registrado, verás la entrega en Pendientes de finalizar.",
     "error_generic": "Algo salió mal. Inténtalo de nuevo."
   },
   "batch": {
@@ -624,5 +626,23 @@
       "submit": "Subir y firmar",
       "done": "Documento adjuntado"
     }
+  },
+  "work": {
+    "title": "Tu trabajo, paso a paso.",
+    "views": "Vistas de trabajo",
+    "tab": "Mi trabajo",
+    "overview": "Resumen del piloto",
+    "your_center": "Tu centro de acopio",
+    "center_unassigned": "Sin centro asignado",
+    "center_unassigned_hint": "Un administrador debe asignarte un centro antes de que puedas registrar entregas.",
+    "centers_error": "No se pudo cargar tu centro.",
+    "committee_title": "Documentos de tu cooperativa",
+    "committee_open": "Ver lotes de mi cooperativa",
+    "waiting_title": "Esperando al productor",
+    "waiting_hint": "Estas entregas necesitan una respuesta en Telegram. Todavía no están listas para tu firma.",
+    "waiting_empty": "No hay entregas esperando al productor.",
+    "processing_title": "Confirmaciones en proceso",
+    "history_title": "Historial reciente de entregas",
+    "show_more": "Ver más"
   }
 }

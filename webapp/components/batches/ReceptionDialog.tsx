@@ -88,7 +88,7 @@ export function ReceptionDialog({
 
   return (
     <DialogShell
-      title={t('title')}
+      title={t(confirmed != null ? 'title_confirmed' : 'title')}
       subtitle={<span className="font-mono">{batch.number}</span>}
       closeLabel={t('close')}
       busy={busy}

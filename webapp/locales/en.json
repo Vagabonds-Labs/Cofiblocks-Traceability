@@ -212,7 +212,7 @@
     "admin_users_text": "Assign each person their role and cooperative. The role is written to the contract.",
     "admin_farmers_text": "Upload the farmer list of each cooperative and follow their registration in the bot.",
     "open": "Open",
-    "tasks_COLLECTOR": "Record the deliveries at your center and weigh the ones the farmer confirmed.",
+    "tasks_COLLECTOR": "Record deliveries, follow farmer confirmations and finalize receptions at your center.",
     "tasks_INDUSTRY_MANAGER": "Move your cooperative's batches through washing, fermentation and drying, and attach documents.",
     "tasks_STORE_KEEPER": "Record storage and the shipment to the union.",
     "tasks_EXPORT_MANAGER": "Prepare batches for export and record them as sold.",
@@ -418,14 +418,15 @@
     "exporting": "Exporting…"
   },
   "pending": {
-    "title": "Deliveries to weigh",
-    "subtitle": "The farmer confirmed these deliveries in the bot. Sign the weight and photograph the receipt.",
+    "title": "Pending receptions",
+    "subtitle": "Review the weight, attach the receipt and sign the reception.",
     "count": "{count} pending",
-    "empty": "Nothing to weigh right now.",
+    "empty": "No receptions waiting for you right now.",
     "delivered": "Delivered {time} at {center}",
     "estimated": "about {kg} kg",
     "weigh": "Record weight",
-    "confirmed": "{kg} kg confirmed by the farmer"
+    "confirmed": "{kg} kg confirmed by the farmer",
+    "finalize": "Finalize reception"
   },
   "reception": {
     "title": "Record weight and receipt",
@@ -448,7 +449,8 @@
     "view_tx": "See the transaction on Stellar",
     "error_generic": "Something went wrong. Try again.",
     "error_cancelled": "You cancelled the signature. Nothing was recorded.",
-    "weight_confirmed": "The farmer confirmed this weight in the bot. It is the one recorded on Stellar."
+    "weight_confirmed": "The farmer confirmed this weight in the bot. It is the one recorded on Stellar.",
+    "title_confirmed": "Finalize reception"
   },
   "summary": {
     "title": "The pilot at a glance",
@@ -516,7 +518,7 @@
     "waiting_count": "{count} waiting for the farmer",
     "kg": "{kg} kg",
     "waiting_until": "Waiting for the farmer to confirm in the bot, until {time}.",
-    "confirmed_batch": "Confirmed by the farmer: batch {batch}. Sign the weight below.",
+    "confirmed_batch": "Confirmed by the farmer: batch {batch}.",
     "cancel": "Cancel",
     "status": {
       "PENDING": "Waiting",
@@ -547,7 +549,7 @@
     "submit": "Send to the farmer to confirm",
     "sending": "Sending…",
     "sent": "{kg} kg sent to the farmer",
-    "sent_text": "{farmer} will be asked in the bot to confirm it. When they do, it appears in Deliveries to weigh for you to sign the weight.",
+    "sent_text": "{farmer} will be asked to confirm in the bot. Once confirmed and recorded, the delivery appears in Pending receptions for you to finalize.",
     "error_generic": "Something went wrong. Try again."
   },
   "batch": {
@@ -624,5 +626,23 @@
       "submit": "Upload and sign",
       "done": "Document attached"
     }
+  },
+  "work": {
+    "title": "Your work, one step at a time.",
+    "views": "Workspace views",
+    "tab": "My work",
+    "overview": "Pilot overview",
+    "your_center": "Your collection center",
+    "center_unassigned": "No center assigned",
+    "center_unassigned_hint": "An administrator needs to assign your collection center before you can record deliveries.",
+    "centers_error": "Could not load your center.",
+    "committee_title": "Your cooperative’s documents",
+    "committee_open": "View my cooperative’s batches",
+    "waiting_title": "Waiting for the farmer",
+    "waiting_hint": "These deliveries need a response in Telegram. They are not ready for your signature yet.",
+    "waiting_empty": "No deliveries are waiting for the farmer.",
+    "processing_title": "Confirmations being recorded",
+    "history_title": "Recent delivery history",
+    "show_more": "Show more"
   }
 }
